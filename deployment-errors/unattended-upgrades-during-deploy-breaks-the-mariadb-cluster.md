@@ -1,7 +1,7 @@
 ---
 title: kolla-ansible deploy fails part-way, a container never starts and MariaDB never forms its cluster, because Ubuntu upgraded packages during the deploy
 kind: runbook
-status: lab-verified
+status: draft
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, mariadb, docker, systemd]
 deployment_methods: [kolla-ansible]
@@ -11,8 +11,7 @@ environment:
   storage: local
   os: ubuntu-24.04 (noble), docker
 risk: state-changing
-confirmed_by:
-  - { who: "lab:ozar-lab", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, 3 controllers + 2 computes, Ubuntu Noble", date: "2026-10-13", note: "failure met on a real lab deploy; prevention (timers stopped before deploying) applied on every later build, no recurrence; recovery in place not tried" }
+confirmed_by: []
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/quickstart.html
   - https://help.ubuntu.com/community/AutomaticSecurityUpdates

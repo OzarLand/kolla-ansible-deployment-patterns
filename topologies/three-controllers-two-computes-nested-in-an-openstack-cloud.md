@@ -1,7 +1,7 @@
 ---
 title: Three controllers and two computes, nested inside an existing OpenStack cloud
 kind: pattern
-status: lab-verified
+status: draft
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, nova, neutron, ovs, keepalived, haproxy, mariadb, rabbitmq, docker]
 deployment_methods: [kolla-ansible]
@@ -11,8 +11,7 @@ environment:
   network: ml2/ovs, VXLAN tenant networks, provider network on the controllers
   storage: local instance store on each compute (one dedicated volume each); no Cinder, no Ceph
   os: ubuntu-24.04 (noble) on the lab hosts, ubuntu-22.04 on the deploy host; docker
-confirmed_by:
-  - { who: "lab:ozar-lab", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, images 2026.1-ubuntu-noble", date: "2026-10-13", note: "built from scratch on several lab builds in October 2026; baseline checks, VIP failover and a canary instance per compute passed on each build" }
+confirmed_by: []
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/multinode.html
   - https://docs.openstack.org/kolla-ansible/latest/admin/advanced-configuration.html
@@ -173,7 +172,8 @@ Everything else: Kolla-Ansible defaults (`neutron_plugin_agent: openvswitch`, `n
 ## Validity and limits
 
 Built repeatedly in October 2026 with OpenStack 2026.1, Kolla-Ansible 22.2.0, images `2026.1-ubuntu-noble`, Docker,
-Open vSwitch, inside one particular hosting cloud. Not tried: OVN, Podman, Cinder or Ceph, dedicated network nodes,
+Open vSwitch, inside one particular hosting cloud. On each build the baseline checks, a VIP failover and a canary
+instance per compute passed. Not tried: OVN, Podman, Cinder or Ceph, dedicated network nodes,
 other host distributions, other hosting clouds. This is a lab pattern: it is not a recommendation for production,
 where the external network, storage and failure domains would be designed very differently.
 

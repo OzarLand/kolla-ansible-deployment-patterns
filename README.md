@@ -62,7 +62,7 @@ wrong, version notes, lessons learned, validity and limits.
 
 | Deployment error | Releases | Status |
 |---|---|---|
-| [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | lab-verified |
+| [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | draft |
 
 ## First pages to write
 
