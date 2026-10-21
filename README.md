@@ -66,6 +66,10 @@ wrong, version notes, lessons learned, validity and limits.
 |---|---|---|
 | [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | draft |
 
+| Configuration pattern | Releases | Status |
+|---|---|---|
+| [Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets](configuration/inventory-globals-overrides-and-secrets-layout.md) | 2026.1 | draft |
+
 ## First pages to write
 
 1. All-in-one lab for learning and testing changes before production.
