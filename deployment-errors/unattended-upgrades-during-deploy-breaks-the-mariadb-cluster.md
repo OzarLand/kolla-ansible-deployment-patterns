@@ -10,7 +10,7 @@ environment:
   network: ml2/ovs
   storage: local
   os: ubuntu-24.04 (noble), docker
-risk: state-changing
+risk: destructive
 confirmed_by: []
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/quickstart.html
@@ -97,12 +97,29 @@ A run already in progress is never stopped: a half-applied `dpkg` run is worse t
 The lab was throw-away, so it was rebuilt from scratch with the prevention above; recovery in place was not tried.
 What an operator would do, not observed here:
 
-> ⚠️ **State-changing.** Re-running the deploy restarts containers on every host it touches.
-
 1. Let any running upgrade finish (above).
-2. On a platform that already holds data, recover Galera with Kolla-Ansible's procedure before anything else:
-   `kolla-ansible mariadb-recovery -i <inventory>`.
-3. Re-run the `kolla-ansible deploy -i <inventory>` (or the `reconfigure` or `upgrade`) that failed.
+2. On a platform that already holds data, recover Galera with Kolla-Ansible's procedure before anything else.
+
+   > 🛑 **Destructive.** `mariadb-recovery` stops MariaDB on every controller, picks the node with the most advanced
+   > state, bootstraps a new cluster from it, and makes the other nodes rejoin with a full state transfer that
+   > replaces their data. Any transaction that only reached the nodes not chosen is lost. Every OpenStack API is
+   > unavailable while it runs. Run it only when the cluster has really lost quorum (no node reports
+   > `wsrep_cluster_status` `Primary`, or every `mariadb` container is down), and when no deploy, upgrade or apt run
+   > is in progress. Before running it, with the `mariadb` container stopped on each controller, copy its data
+   > volume aside (for example `sudo cp -a /var/lib/docker/volumes/mariadb /root/mariadb-before-recovery`) and
+   > note the `seqno` in `grastate.dat` on each node. It cannot be undone: going back means restoring those copies.
+
+   ```bash
+   kolla-ansible mariadb-recovery -i <inventory>
+   ```
+
+3. Re-run the deploy that failed.
+
+   > ⚠️ **State-changing.** Re-running the deploy restarts containers on every host it touches.
+
+   ```bash
+   kolla-ansible deploy -i <inventory>    # or the reconfigure or upgrade that failed
+   ```
 
 ## Verification
 
