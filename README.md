@@ -58,7 +58,11 @@ wrong, version notes, lessons learned, validity and limits.
 
 | Pattern | Purpose | Scale | Network | Storage | Releases |
 |---|---|---|---|---|---|
-| | | | | | |
+| [Three controllers and two computes, nested inside an existing OpenStack cloud](topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md) | lab | 3 controllers, 2 computes | OVS, VXLAN | local instance store | 2026.1 |
+
+| Deployment error | Releases | Status |
+|---|---|---|
+| [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | lab-verified |
 
 ## First pages to write
 
