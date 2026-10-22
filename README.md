@@ -83,6 +83,10 @@ wrong, version notes, lessons learned, validity and limits.
 |---|---|---|
 | [From 2025.1 to 2026.1. What changes for a Kolla-Ansible deployment, from the release notes](version-notes/2025.1-to-2026.1.md) | 2025.1, 2026.1 | draft |
 
+| Experience report | Releases | Status |
+|---|---|---|
+| [Upgrading an all-in-one lab from 2025.1 to 2026.1 with Kolla-Ansible, what happened](version-notes/upgrade-report-2025.1-to-2026.1-all-in-one-lab.md) | 2025.1, 2026.1 | draft |
+
 ## First pages to write
 
 1. All-in-one lab for learning and testing changes before production.
