@@ -79,6 +79,10 @@ wrong, version notes, lessons learned, validity and limits.
 |---|---|---|
 | [Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets](configuration/inventory-globals-overrides-and-secrets-layout.md) | 2026.1 | draft |
 
+| Version notes | Releases | Status |
+|---|---|---|
+| [From 2025.1 to 2026.1. What changes for a Kolla-Ansible deployment, from the release notes](version-notes/2025.1-to-2026.1.md) | 2025.1, 2026.1 | draft |
+
 ## First pages to write
 
 1. All-in-one lab for learning and testing changes before production.
