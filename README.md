@@ -63,6 +63,10 @@ wrong, version notes, lessons learned, validity and limits.
 | [Three controllers and two computes, nested inside an existing OpenStack cloud](topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md) | lab | 3 controllers, 2 computes | OVS, VXLAN | local instance store | 2026.1 |
 | [All-in-one lab on a single VM, nested inside an existing OpenStack cloud](topologies/all-in-one-lab-on-a-single-vm.md) | lab | 1 node (all-in-one) | OVS | local root disk | 2026.1 |
 
+| Networking pattern | Releases | Status |
+|---|---|---|
+| [Network interfaces, VLANs and MTU for a multinode deployment, with Open vSwitch and OVN side by side](networking/interfaces-vlans-and-mtu-ovs-and-ovn.md) | 2026.1 | draft |
+
 | Deployment error | Releases | Status |
 |---|---|---|
 | [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | draft |
