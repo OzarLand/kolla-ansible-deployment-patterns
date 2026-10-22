@@ -61,6 +61,7 @@ wrong, version notes, lessons learned, validity and limits.
 | Pattern | Purpose | Scale | Network | Storage | Releases |
 |---|---|---|---|---|---|
 | [Three controllers and two computes, nested inside an existing OpenStack cloud](topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md) | lab | 3 controllers, 2 computes | OVS, VXLAN | local instance store | 2026.1 |
+| [All-in-one lab on a single VM, nested inside an existing OpenStack cloud](topologies/all-in-one-lab-on-a-single-vm.md) | lab | 1 node (all-in-one) | OVS | local root disk | 2026.1 |
 
 | Deployment error | Releases | Status |
 |---|---|---|
