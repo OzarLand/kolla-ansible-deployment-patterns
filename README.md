@@ -89,12 +89,11 @@ wrong, version notes, lessons learned, validity and limits.
 
 ## First pages to write
 
-1. All-in-one lab for learning and testing changes before production.
-2. Three controllers, OVN, Ceph RBD: a common production baseline, with its consequences.
-3. Separated storage and storage-replication networks: why, and what it costs.
-4. Keeping lab, pre-production and production inventories aligned: one layout that worked.
-5. Comparison: OVN versus OVS as seen from operations (not from features).
-6. Deployment errors: the five most common `kolla-ansible deploy` failures and what they meant.
+1. Three controllers, OVN, Ceph RBD: a common production baseline, with its consequences.
+2. Separated storage and storage-replication networks: why, and what it costs.
+3. Keeping lab, pre-production and production inventories aligned: one layout that worked.
+4. Comparison: OVN versus OVS as seen from operations (not from features).
+5. Deployment errors: the five most common `kolla-ansible deploy` failures and what they meant.
 
 ## Contributing
 
