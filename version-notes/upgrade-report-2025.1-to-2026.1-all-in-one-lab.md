@@ -55,7 +55,7 @@ and floating IPs went through.
 1. Deploy 2025.1 on a fresh VM, the way we deploy 2026.1 labs (see
    [all-in-one lab on a single VM](../topologies/all-in-one-lab-on-a-single-vm.md)). Create a router, a tenant
    network, an external network and two CirrOS instances, each with a floating IP. Record their state.
-2. Follow the eight steps of the version notes in order:
+2. Follow the nine steps of the version notes in order:
    1. back up the configuration and the database (Kolla-Ansible's `mariadb-backup`), check both, copy them off the host;
    2. upgrade Ansible and Kolla-Ansible in the same virtual environment;
    3. run `install-deps`;
@@ -63,7 +63,8 @@ and floating IPs went through.
    5. update `globals.yml` and merge `passwords.yml`;
    6. run `pull` and `prechecks`;
    7. check the RabbitMQ upgrade path;
-   8. run `upgrade`.
+   8. run `upgrade`;
+   9. remove the old images, once the platform is checked.
 3. During `upgrade`, measure:
    - a ping every 0.5 s to each floating IP (traffic already flowing);
    - every 5 s, a *new* ping to one instance and an HTTP request to Keystone, Nova and Neutron;
