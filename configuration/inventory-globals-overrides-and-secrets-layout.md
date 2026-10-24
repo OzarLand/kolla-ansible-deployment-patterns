@@ -1,7 +1,7 @@
 ---
 title: Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets
 kind: pattern
-status: draft
+status: lab-verified
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, ansible]
 deployment_methods: [kolla-ansible]
@@ -12,7 +12,8 @@ environment:
   storage: any
   os: any
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, all-in-one", date: 2026-10-24, note: "the layout built for one environment with an encrypted passwords.yml; prechecks, genconfig, validate-config and reconfigure run with --configdir and the vault; precedence and override locations checked; HashiCorp Vault and mergepwd not run" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/user/quickstart.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/multinode.html
@@ -20,7 +21,7 @@ upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html
   - https://docs.ansible.com/ansible/latest/vault_guide/index.html
 authored_by: agent:ozarland-author
-last_verified: 2026-10-21
+last_verified: 2026-10-24
 ---
 
 # Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets
@@ -69,7 +70,10 @@ From the 2026.1 command-line tool and documentation:
 - `node_custom_config` defaults to `<configdir>/config`: the per-service overrides. Kolla-Ansible looks for
   `config/<file>`, `config/<service>/<file>` and `config/<service>/<hostname>/<file>`, for example
   `config/nova.conf`, `config/nova/nova-scheduler.conf` and `config/nova/<hostname>/nova.conf`, and merges the INI
-  sections into the generated file. `config/global.conf` applies to every service. The exact list of locations
+  sections into the generated file. `<hostname>` is the host's name **in the inventory**
+  (`inventory_hostname`), not the machine's hostname: on an all-in-one the inventory names the host `localhost`,
+  and a lab found `config/nova/<machine-hostname>/nova.conf` silently ignored while `config/nova/localhost/nova.conf`
+  applied. `config/global.conf` applies to every service. The exact list of locations
   varies by role; the role's config task is the reference.
 - `-i` can be given several times; the operating guide notes that common configuration can live in one inventory
   and environment-specific details in another.
@@ -135,7 +139,10 @@ exactly what differs between them.
 
 `kolla-ansible genconfig` generates the configuration files on the hosts without restarting the containers, and
 `kolla-ansible validate-config` validates the generated files (results under `/var/log/kolla/config-validate` when
-issues are found).
+issues are found). On a lab, `validate-config` ended with `failed=0` but still wrote one `.err` file per Nova service,
+with `ERROR:` lines for Kolla-Ansible's own unchanged configuration (for example `service_user/region_name is not part
+of the sample config` and `privsep_entrypoint/helper_command is not part of the sample config`). Run it once before
+your change and compare: only new lines are about your change.
 
 > ⚠️ **State-changing.** `genconfig` writes the new configuration files on the target hosts. Containers keep running
 > with the old files until they restart, so a host or container restart applies the change unannounced. Run
@@ -220,9 +227,10 @@ ansible-vault encrypt $TMP/passwords.yml --output $ENV/passwords.yml
 shred -u $TMP/passwords.yml*; rmdir $TMP
 ```
 
-The two paths come from the quickstart (`etc_examples/kolla`) and the operating guide (`etc/kolla`); use the one
-your installation has. To see locally which keys changed, `git diff` can use a `textconv` driver set to
-`ansible-vault view`. Never paste decrypted values into a pull request.
+The two paths come from the quickstart (`etc_examples/kolla`) and the operating guide (`etc/kolla`); use the one your
+installation has. A `pip install kolla-ansible` (22.2.0) has only `share/kolla-ansible/etc_examples/kolla/`. To see
+locally which keys changed, `git diff` can use a `textconv` driver set to `ansible-vault view`. Never paste decrypted
+values into a pull request.
 
 ## Key choices and their consequences
 
@@ -236,7 +244,9 @@ your installation has. To see locally which keys changed, `git diff` can use a `
 
 ## What went wrong during deployment
 
-Nothing recorded yet: this page is written from the upstream documentation and source, not from a deployment.
+Applied on a lab (see [Validity and limits](#validity-and-limits)) without failure. The one surprise: a per-host
+override placed under the machine's hostname was ignored without any message; the directory must carry the
+inventory name.
 Contributions with real failures (a value in `globals.yml` that should have been per host, an override in the wrong
 directory, a secret committed by mistake) are welcome here.
 
@@ -251,7 +261,14 @@ directory, a secret committed by mistake) are welcome here.
 
 ## Lessons learned
 
-No first-hand lessons yet. What the upstream documentation stresses, and what this layout follows from:
+From the lab run:
+
+- Check that an override applied by reading the generated file on the host (`/etc/kolla/<service>/<file>`) after
+  `genconfig`; Kolla-Ansible does not report an override directory it did not use.
+- `--vault-password-file` works the same as `--ask-vault-pass` and suits scripts; keep the file outside the
+  repository (the `.gitignore` above covers `.vault-pass*`).
+
+What the upstream documentation stresses, and what this layout follows from:
 
 - The variable precedence rule (extra variables win) is the most common source of a value that "does not apply".
 - Overrides are merged section by section for services that use oslo.config; files that are not INI are replaced
@@ -262,9 +279,28 @@ No first-hand lessons yet. What the upstream documentation stresses, and what th
 ## Validity and limits
 
 Written from the Kolla-Ansible 2026.1 documentation (quickstart, multinode, advanced configuration, operating
-Kolla) and the 2026.1 source of `kolla-ansible`, `kolla-genpwd` and `kolla-mergepwd`. Not applied on a platform
-yet. Not covered: Kayobe, which has its own configuration layout; CI pipelines that run `kolla-ansible`; secret
-stores other than Ansible Vault and HashiCorp Vault; per-cell or multi-region layouts.
+Kolla) and the 2026.1 source of `kolla-ansible`, `kolla-genpwd` and `kolla-mergepwd`.
+
+Applied on an all-in-one lab on 2026-10-24 (OpenStack 2026.1, Kolla-Ansible 22.2.0), for one environment of the
+layout above, with `passwords.yml` encrypted by Ansible Vault:
+
+| Checked | Result |
+|---|---|
+| First-deployment password block (`kolla-genpwd -p`, `ansible-vault encrypt`, `shred`) | As written; the file starts with `$ANSIBLE_VAULT;1.1;AES256` |
+| The `.gitignore` | `passwords.yml.old`, `clouds.yaml`, `admin-openrc.sh` and a `.keyring` ignored; the encrypted `passwords.yml` and `globals.yml` tracked |
+| `prechecks`, `genconfig`, `validate-config`, `reconfigure` with `-i`, `--configdir` and `--vault-password-file` | `failed=0` each |
+| Same variable in `globals.yml` and `globals.d/30-debug.yml` | `globals.d` won |
+| Same variable in `globals.yml` and `host_vars/<host>.yml` | `globals.yml` won (extra variables), as the page says |
+| Variable only in `host_vars/<host>.yml` | Applied |
+| `config/nova/<inventory-name>/nova.conf`, `config/nova/nova-compute.conf` | Applied |
+| `config/nova/<machine-hostname>/nova.conf` | Ignored (see above) |
+| After `genconfig` | The running `nova_compute` kept its old file; `reconfigure` recreated it with the new one |
+| `--passwords` | The 2026.1 source checks the file given, then passes `<configdir>/passwords.yml` to Ansible, as the page says |
+
+Not run: HashiCorp Vault (`kolla-writepwd`, `kolla-readpwd`), `kolla-mergepwd` on an upgrade, a second environment and
+`diff -r`, a multinode inventory with `group_vars`. Not covered: Kayobe, which has its own configuration layout; CI
+pipelines that run `kolla-ansible`; secret stores other than Ansible Vault and HashiCorp Vault; per-cell or
+multi-region layouts.
 
 ## Related
 
