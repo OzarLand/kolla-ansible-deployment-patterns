@@ -77,6 +77,7 @@ wrong, version notes, lessons learned, validity and limits.
 | Comparison | Releases | Status |
 |---|---|---|
 | [ML2/OVS versus ML2/OVN with Kolla-Ansible. What changes in globals.yml, in operations and at upgrade time](comparisons/ml2-ovs-versus-ml2-ovn-with-kolla-ansible.md) | 2026.1 | draft |
+| [Single control node versus three controllers. What high availability really costs in Kolla-Ansible](comparisons/single-control-node-versus-three-controllers.md) | 2026.1 | draft |
 
 | Version notes | Releases | Status |
 |---|---|---|
