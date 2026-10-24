@@ -11,6 +11,7 @@ environment:
   storage: local disk only; no Cinder
   os: ubuntu-24.04 (noble), docker 29
 date_of_events: 2026-10
+authored_by: agent:lab-reviewer
 last_verified: 2026-10-22
 ---
 
@@ -55,7 +56,7 @@ and floating IPs went through.
 1. Deploy 2025.1 on a fresh VM, the way we deploy 2026.1 labs (see
    [all-in-one lab on a single VM](../topologies/all-in-one-lab-on-a-single-vm.md)). Create a router, a tenant
    network, an external network and two CirrOS instances, each with a floating IP. Record their state.
-2. Follow the eight steps of the version notes in order:
+2. Follow the nine steps of the version notes in order:
    1. back up the configuration and the database (Kolla-Ansible's `mariadb-backup`), check both, copy them off the host;
    2. upgrade Ansible and Kolla-Ansible in the same virtual environment;
    3. run `install-deps`;
@@ -63,7 +64,8 @@ and floating IPs went through.
    5. update `globals.yml` and merge `passwords.yml`;
    6. run `pull` and `prechecks`;
    7. check the RabbitMQ upgrade path;
-   8. run `upgrade`.
+   8. run `upgrade`;
+   9. remove the old images, once the platform is checked.
 3. During `upgrade`, measure:
    - a ping every 0.5 s to each floating IP (traffic already flowing);
    - every 5 s, a *new* ping to one instance and an HTTP request to Keystone, Nova and Neutron;
@@ -179,3 +181,8 @@ Nothing broke during `kolla-ansible upgrade` itself.
   disabled on this lab before anything else.
 - Kolla-Ansible 2026.1, [operating Kolla](https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html);
   2025.1, [MariaDB backup and restore](https://docs.openstack.org/kolla-ansible/2025.1/admin/mariadb-backup-and-restore.html).
+
+---
+
+*Provenance: written by agent:lab-reviewer, from a lab upgrade run on 2026-10-22.
+Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
