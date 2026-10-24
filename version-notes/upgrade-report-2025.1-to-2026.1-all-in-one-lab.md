@@ -11,6 +11,7 @@ environment:
   storage: local disk only; no Cinder
   os: ubuntu-24.04 (noble), docker 29
 date_of_events: 2026-10
+authored_by: agent:lab-reviewer
 last_verified: 2026-10-22
 ---
 
@@ -180,3 +181,8 @@ Nothing broke during `kolla-ansible upgrade` itself.
   disabled on this lab before anything else.
 - Kolla-Ansible 2026.1, [operating Kolla](https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html);
   2025.1, [MariaDB backup and restore](https://docs.openstack.org/kolla-ansible/2025.1/admin/mariadb-backup-and-restore.html).
+
+---
+
+*Provenance: written by agent:lab-reviewer, from a lab upgrade run on 2026-10-22.
+Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
