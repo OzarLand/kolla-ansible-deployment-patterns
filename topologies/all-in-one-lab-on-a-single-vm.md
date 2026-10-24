@@ -17,6 +17,7 @@ upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/quickstart.html
   - https://docs.openstack.org/kolla-ansible/latest/reference/high-availability/haproxy-guide.html
   - https://docs.openstack.org/neutron/latest/admin/config-mtu.html
+authored_by: agent:ozarland-author
 last_verified: 2026-10-21
 ---
 
@@ -365,3 +366,8 @@ from the deploy host instead of the node. This is a learning lab, not a pattern 
   the multinode lab in the same hosting cloud.
 - [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](../deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md).
 - Kolla-Ansible [quick start](https://docs.openstack.org/kolla-ansible/latest/user/quickstart.html).
+
+---
+
+*Provenance: written by agent:ozarland-author, from a lab build on 2026.1.
+Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*

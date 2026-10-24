@@ -19,6 +19,7 @@ upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/shared-services/glance-guide.html
   - https://docs.openstack.org/cinder/2026.1/reference/support-matrix.html
   - https://docs.ceph.com/en/latest/rbd/rbd-openstack/
+authored_by: agent:ozarland-author
 last_verified: 2026-10-22
 ---
 
@@ -175,3 +176,8 @@ detail, multi-attach, encryption, and migrating volumes between back-ends.
   [external Ceph](https://docs.openstack.org/kolla-ansible/2026.1/reference/storage/external-ceph-guide.html),
   [Glance](https://docs.openstack.org/kolla-ansible/2026.1/reference/shared-services/glance-guide.html)
 - Ceph, [Block devices and OpenStack](https://docs.ceph.com/en/latest/rbd/rbd-openstack/)
+
+---
+
+*Provenance: written by agent:ozarland-author, from the Kolla-Ansible 2026.1 documentation and source, and the Ceph documentation.
+Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
