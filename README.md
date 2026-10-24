@@ -8,11 +8,6 @@ Part of [OzarLand](https://github.com/OzarLand/ozarland), a collaborative knowle
 operators. Share experiences, document solutions, learn from each other. No imposed tools, no single way of
 operating OpenStack.
 
-> **Repository metadata to apply:** description "Deployment patterns for OpenStack with Kolla-Ansible, from real
-> platforms: topologies, network and storage choices, inventories, configuration layout, common errors, version
-> notes. Compared, not prescribed." Topics: `openstack`, `kolla-ansible`, `kolla`, `deployment`,
-> `reference-architecture`, `openstack-operations`, `ansible`.
-
 ## Scope
 
 This repository documents the many ways operators deploy OpenStack with [Kolla-Ansible](https://docs.openstack.org/kolla-ansible/latest/),
@@ -89,19 +84,21 @@ wrong, version notes, lessons learned, validity and limits.
 
 ## First pages to write
 
-1. All-in-one lab for learning and testing changes before production.
-2. Three controllers, OVN, Ceph RBD: a common production baseline, with its consequences.
-3. Separated storage and storage-replication networks: why, and what it costs.
-4. Keeping lab, pre-production and production inventories aligned: one layout that worked.
-5. Comparison: OVN versus OVS as seen from operations (not from features).
-6. Deployment errors: the five most common `kolla-ansible deploy` failures and what they meant.
+1. Three controllers, OVN, Ceph RBD: a common production baseline, with its consequences.
+2. Separated storage and storage-replication networks: why, and what it costs.
+3. Keeping lab, pre-production and production inventories aligned: one layout that worked.
+4. Comparison: OVN versus OVS as seen from operations (not from features).
+5. Deployment errors: the five most common `kolla-ansible deploy` failures and what they meant.
 
 ## Contributing
 
-- **Compare approaches:** start a *Show and compare* discussion.
+- **Ask a question or compare approaches:** [open a Q&A discussion](https://github.com/OzarLand/ozarland/discussions/new?category=q-a)
+  in `ozarland`, where all OzarLand discussions live.
 - **Share your pattern:** copy `templates/deployment-pattern.md`, open a pull request. Describe your context first.
-- **Add a variant or a consequence to an existing pattern:** open a pull request or a *Documentation proposal* issue.
-- **Report a deployment error you solved:** open an issue with the *Problem solved* template.
+- **Confirm a page, add a variant or a consequence to it:** open a pull request or a
+  [*Documentation proposal* issue](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml).
+- **Report a deployment error you solved:** open an issue with the
+  [*Problem solved* form](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=problem-solved.yml).
 
 Rules that are not optional: no secrets (never `passwords.yml` content), no real hostnames, addresses or
 unredacted logs; say where your pattern runs and for how long. Full guide: [CONTRIBUTING.md](CONTRIBUTING.md).
