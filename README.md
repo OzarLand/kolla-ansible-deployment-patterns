@@ -74,6 +74,10 @@ wrong, version notes, lessons learned, validity and limits.
 |---|---|---|
 | [Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets](configuration/inventory-globals-overrides-and-secrets-layout.md) | 2026.1 | draft |
 
+| Comparison | Releases | Status |
+|---|---|---|
+| [ML2/OVS versus ML2/OVN with Kolla-Ansible. What changes in globals.yml, in operations and at upgrade time](comparisons/ml2-ovs-versus-ml2-ovn-with-kolla-ansible.md) | 2026.1 | draft |
+
 | Version notes | Releases | Status |
 |---|---|---|
 | [From 2025.1 to 2026.1. What changes for a Kolla-Ansible deployment, from the release notes](version-notes/2025.1-to-2026.1.md) | 2025.1, 2026.1 | draft |
@@ -87,8 +91,7 @@ wrong, version notes, lessons learned, validity and limits.
 1. Three controllers, OVN, Ceph RBD: a common production baseline, with its consequences.
 2. Separated storage and storage-replication networks: why, and what it costs.
 3. Keeping lab, pre-production and production inventories aligned: one layout that worked.
-4. Comparison: OVN versus OVS as seen from operations (not from features).
-5. Deployment errors: the five most common `kolla-ansible deploy` failures and what they meant.
+4. Deployment errors: the five most common `kolla-ansible deploy` failures and what they meant.
 
 ## Contributing
 
