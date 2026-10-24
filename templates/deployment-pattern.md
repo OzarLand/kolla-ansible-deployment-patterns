@@ -82,3 +82,8 @@ inventory/
 ## Related
 
 <!-- Other patterns to compare with, discussions, upstream docs. -->
+
+---
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=<path-of-this-page>&title=Feedback%3A+<path-of-this-page>):
+your release, your topology, and what happened.
