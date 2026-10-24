@@ -11,8 +11,9 @@ environment:
   network: any
   storage: lvm, ceph-rbd (external), nfs
   os: any supported by Kolla-Ansible 2026.1
-risk: read-only
-confirmed_by: []
+risk: state-changing
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, all-in-one", date: 2026-10-24, note: "LVM part only: deployed with the snippet, corrected; Ceph and NFS not run" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/storage/cinder-guide.html
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/storage/external-ceph-guide.html
@@ -20,7 +21,7 @@ upstream_refs:
   - https://docs.openstack.org/cinder/2026.1/reference/support-matrix.html
   - https://docs.ceph.com/en/latest/rbd/rbd-openstack/
 authored_by: agent:ozarland-author
-last_verified: 2026-10-22
+last_verified: 2026-10-24
 ---
 
 # Cinder and Glance back-ends compared. LVM, Ceph RBD and NFS, and what each choice implies
@@ -61,7 +62,7 @@ configuration; this page does not cover it.
 |---|---|---|---|
 | What Kolla-Ansible deploys | `cinder-volume` with the LVM driver; `tgtd` (iSCSI target) on the storage hosts; `iscsid` with `nova-compute` and with `cinder-volume`/`cinder-backup` | Only the clients: Kolla-Ansible "does not provide support for provisioning and configuring a Ceph cluster" (external Ceph guide) | `cinder-volume` with the NFS driver, mounting the shares listed in `/etc/kolla/config/nfs_shares` |
 | What you operate besides | A volume group named `cinder-volumes` on each storage host (`pvcreate`, `vgcreate`) | A Ceph cluster, deployed with a dedicated tool (`cephadm`, ceph-ansible), its pools and keyrings | NFS servers and their exports |
-| Where a volume lives | On the disks of one storage host | Replicated across the Ceph cluster | On one NFS server's export |
+| Where a volume lives | On the disks of one storage host, as a thin logical volume in a `cinder-volumes-pool` thin pool (observed on a lab; the pool reports `max_over_subscription_ratio` 20) | Replicated across the Ceph cluster | On one NFS server's export |
 | Loss of the host holding the volume | Its volumes are unavailable until the host returns | Ceph keeps serving from the replicas, within its own redundancy | Its volumes are unavailable until the server returns |
 | Several `cinder-volume` hosts | Known issues with LVM in a multi-controller setup (bug 1571211, cited in the Cinder guide) | Active/active with `cinder_cluster_name`, when the driver supports it (Cinder support matrix) | Depends on the driver's active/active support; check the support matrix |
 | Glance on the same back-end | No: Glance has no LVM back-end; use `file` or `s3` | Yes, `glance_backend_ceph`; copy-on-write clones for boot-from-image with `show_image_direct_url` | Indirectly: Glance `file` with `glance_file_datadir_volume` on a shared filesystem such as NFS |
@@ -83,16 +84,40 @@ From the Glance guide:
 
 ### What to set, per choice
 
+Every choice also needs `enable_cinder: "yes"`: its 2026.1 default is `false`, and a back-end setting alone deploys
+no Cinder at all (observed on a lab with the LVM setting: `deploy` ended with `failed=0` and no Cinder container).
+
 LVM, with the volume group created on each storage host beforehand:
+
+```bash
+sudo pvcreate /dev/<disk> && sudo vgcreate cinder-volumes /dev/<disk>   # the name cinder_volume_group expects
+```
 
 ```yaml
 # globals.yml
-enable_cinder_backend_lvm: true
-cinder_backup_driver: "nfs"          # or "s3", or enable_cinder_backup: false, when there is no Ceph
+enable_cinder: "yes"
+enable_cinder_backend_lvm: "yes"
+enable_cinder_backup: "no"           # or cinder_backup_driver "nfs" with cinder_backup_share, or "s3"
 ```
 
-Ceph RBD, with pools and keyrings created in Ceph, and `ceph.conf` and the keyrings copied under
-`/etc/kolla/config/{glance,cinder,nova}/` as the external Ceph guide lists:
+`cinder-backup` needs a working target. With `cinder_backup_driver: "nfs"` and no `cinder_backup_share`, the
+`deploy` still ends with `failed=0`, but `cinder-backup` cannot mount anything, stops sending heartbeats and shows
+`down`; a backup then fails with `Service not found for creating backup` (observed on a lab).
+
+Setting `enable_cinder_backup: "no"` after `cinder-backup` was deployed does not remove it: the container keeps
+running and the service stays registered, `down`. To remove it:
+
+> ⚠️ **State-changing.** Removes the `cinder-backup` service of one host. Existing backups stay in their target; no
+> new backup can be made until a backup service runs again.
+
+```bash
+sudo systemctl disable --now kolla-cinder_backup-container.service
+sudo docker rm -f cinder_backup
+sudo docker exec cinder_api cinder-manage service remove cinder-backup <host>
+```
+
+Ceph RBD (with `enable_cinder: "yes"` too), with pools and keyrings created in Ceph, and `ceph.conf` and the keyrings
+copied under `/etc/kolla/config/{glance,cinder,nova}/` as the external Ceph guide lists:
 
 ```yaml
 # globals.yml
@@ -105,7 +130,8 @@ NFS, with `/etc/kolla/config/nfs_shares` listing one `<server>:<export>` per lin
 
 ```yaml
 # globals.yml
-enable_cinder_backend_nfs: true
+enable_cinder: "yes"
+enable_cinder_backend_nfs: "yes"
 ```
 
 A read-only check of what Cinder actually runs:
@@ -141,7 +167,12 @@ Ceph keyrings are secrets; keep them out of git as the
 
 ## What went wrong during deployment
 
-Nothing recorded yet: this page is written from the upstream documentation and source.
+The LVM part was applied on an all-in-one lab (see [Validity and limits](#validity-and-limits)). Two settings did not
+do what they seemed to:
+
+- `enable_cinder_backend_lvm` without `enable_cinder`: no Cinder deployed, no error.
+- `cinder_backup_driver: "nfs"` without `cinder_backup_share`: `cinder-backup` deployed and `down` from the start,
+  no error from Kolla-Ansible.
 
 ## Version notes
 
@@ -163,7 +194,20 @@ a migration from one back-end to another) are welcome.
 
 Written from Kolla-Ansible 2026.1 (Cinder guide, external Ceph guide, Glance guide, `etc/kolla/globals.yml`,
 `ansible/group_vars/all/{cinder,glance}.yml`, the multinode inventory, release notes) and the Ceph OpenStack guide.
-Not applied on a platform.
+
+The LVM part was applied on an all-in-one lab on 2026-10-24 (OpenStack 2026.1, Kolla-Ansible 22.2.0, a 20 GB disk
+for `cinder-volumes`):
+
+- **Deployment.** `cinder-api`, `cinder-scheduler`, `cinder-volume` (`<host>@lvm-1`), `tgtd` and `iscsid` were
+  deployed, as the side-by-side table says.
+- **Inventory.** The all-in-one inventory has the 2026.1 groups the Version notes describe (`cinder-volume-lvm` and
+  `cinder-backup-lvm` children of `storage`, `iscsid` in `compute` and `storage`).
+- **Read-only checks.** Worked as written. The pool reported `storage_protocol='iSCSI'` and
+  `thin_provisioning_support='True'`, and a 1 GB volume became a thin LV.
+- **Volumes in use.** On a second all-in-one lab with the same back-end, volumes attached through iSCSI to instances
+  of the same host (the volume runbooks of openstack-vm-runbooks were run there).
+
+The Ceph and NFS columns were not applied on a platform.
 
 Not covered: vendor arrays and their drivers, Cinder `iscsi` with external targets, Manila, Swift, Glance S3 in
 detail, multi-attach, encryption, and migrating volumes between back-ends.
