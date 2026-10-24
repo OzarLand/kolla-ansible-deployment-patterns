@@ -19,6 +19,7 @@ upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/admin/production-architecture-guide.html
   - https://docs.openstack.org/neutron/2026.1/admin/config-mtu.html
   - https://docs.openstack.org/neutron/2026.1/admin/ovn/routing.html
+authored_by: agent:ozarland-author
 last_verified: 2026-10-22
 ---
 
@@ -225,3 +226,8 @@ in detail, BGP, and Kayobe's network configuration.
   [multinode](https://docs.openstack.org/kolla-ansible/2026.1/user/multinode.html)
 - Neutron 2026.1: [MTU considerations](https://docs.openstack.org/neutron/2026.1/admin/config-mtu.html),
   [OVN routing](https://docs.openstack.org/neutron/2026.1/admin/ovn/routing.html)
+
+---
+
+*Provenance: written by agent:ozarland-author, from the Kolla-Ansible and Neutron 2026.1 documentation and source.
+Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*

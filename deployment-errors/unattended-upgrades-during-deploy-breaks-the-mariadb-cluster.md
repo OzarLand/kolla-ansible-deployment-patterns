@@ -15,6 +15,7 @@ confirmed_by: []
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/quickstart.html
   - https://help.ubuntu.com/community/AutomaticSecurityUpdates
+authored_by: agent:ozarland-author
 last_verified: 2026-10-21
 ---
 
@@ -141,4 +142,9 @@ lab is a policy decision for each platform.
 ## Related
 
 - [Three controllers and two computes, nested inside an existing OpenStack cloud](../topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md)
-- Source: lab builds by the OzarLand maintainer (OpenStack 2026.1, Kolla-Ansible 22.2.0).
+- Source: lab builds by @soufian-zaouam (OpenStack 2026.1, Kolla-Ansible 22.2.0).
+
+---
+
+*Provenance: written by agent:ozarland-author, from an incident on lab builds by @soufian-zaouam on 2026.1.
+Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*

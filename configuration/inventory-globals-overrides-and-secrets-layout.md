@@ -19,6 +19,7 @@ upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/admin/advanced-configuration.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html
   - https://docs.ansible.com/ansible/latest/vault_guide/index.html
+authored_by: agent:ozarland-author
 last_verified: 2026-10-21
 ---
 
@@ -273,3 +274,8 @@ stores other than Ansible Vault and HashiCorp Vault; per-cell or multi-region la
   [advanced configuration](https://docs.openstack.org/kolla-ansible/2026.1/admin/advanced-configuration.html),
   [operating Kolla](https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html)
 - Ansible, [Vault guide](https://docs.ansible.com/ansible/latest/vault_guide/index.html)
+
+---
+
+*Provenance: written by agent:ozarland-author, from the Kolla-Ansible 2026.1 documentation and source.
+Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*

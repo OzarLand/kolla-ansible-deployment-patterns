@@ -16,6 +16,7 @@ upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/multinode.html
   - https://docs.openstack.org/kolla-ansible/latest/admin/advanced-configuration.html
   - https://docs.openstack.org/neutron/latest/admin/config-mtu.html
+authored_by: agent:ozarland-author
 last_verified: 2026-10-21
 ---
 
@@ -180,4 +181,9 @@ where the external network, storage and failure domains would be designed very d
 ## Related
 
 - VM runbook: tunnel MTU mismatch, in `openstack-vm-runbooks` (`networking/`).
-- Source: lab builds by the OzarLand maintainer (OpenStack 2026.1, Kolla-Ansible 22.2.0).
+- Source: lab builds by @soufian-zaouam (OpenStack 2026.1, Kolla-Ansible 22.2.0).
+
+---
+
+*Provenance: written by agent:ozarland-author, from lab builds by @soufian-zaouam on 2026.1.
+Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
