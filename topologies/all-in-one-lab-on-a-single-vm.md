@@ -286,8 +286,8 @@ sudo docker exec nova_libvirt sh -c 'virsh dumpxml $(virsh list --name | head -1
 kolla-ansible check -i ~/all-in-one
 ```
 
-On the reference build: 31 containers running (35 on the second build), the instance under KVM, ping and SSH through the floating IP
-working, Horizon answering on `http://192.0.2.25/`, and `kolla-ansible check` with `failed=0`.
+On the reference build: 31 containers running (35 on the second build), the instance under KVM, ping and SSH through
+the floating IP working, Horizon answering on `http://192.0.2.25/`, and `kolla-ansible check` with `failed=0`.
 
 ### Delete the lab
 
