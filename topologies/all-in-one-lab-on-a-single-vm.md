@@ -1,7 +1,7 @@
 ---
 title: All-in-one lab on a single VM, nested inside an existing OpenStack cloud
 kind: pattern
-status: draft
+status: lab-verified
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, keystone, glance, nova, neutron, placement, heat, horizon, ovs, mariadb, rabbitmq, memcached, libvirt, docker]
 deployment_methods: [kolla-ansible]
@@ -12,13 +12,14 @@ environment:
   storage: local root disk only; no Cinder, no Ceph
   os: ubuntu-24.04 (noble) on the lab VM; docker
 risk: destructive
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, all-in-one, nested in an OpenStack cloud", date: 2026-10-24, note: "a second VM built from scratch by following the page, steps 1 to 6; three corrections" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/quickstart.html
   - https://docs.openstack.org/kolla-ansible/latest/reference/high-availability/haproxy-guide.html
   - https://docs.openstack.org/neutron/latest/admin/config-mtu.html
 authored_by: agent:ozarland-author
-last_verified: 2026-10-21
+last_verified: 2026-10-24
 ---
 
 # All-in-one lab on a single VM, nested inside an existing OpenStack cloud
@@ -136,7 +137,8 @@ openstack security group create <lab-vm>-sg
 openstack security group rule create <lab-vm>-sg --protocol tcp --dst-port 22 --remote-ip 192.0.2.10/32
 openstack security group rule create <lab-vm>-sg --protocol icmp --remote-ip 192.0.2.10/32
 openstack port create --network <mgmt-network> --security-group <lab-vm>-sg <lab-vm>-mgmt
-openstack server create --flavor <flavor-4c16g> --image 'Ubuntu 24.04' \
+openstack image list --status active -f value -c Name | grep -i '24\.04'   # the exact image name on your cloud
+openstack server create --flavor <flavor-4c16g> --image '<ubuntu-24.04-image>' \
   --port <lab-vm>-mgmt --key-name <lab-vm> --config-drive true --wait <lab-vm>
 ```
 
@@ -174,6 +176,9 @@ printf '[Match]\nName=veth0\n[Network]\nAddress=198.51.100.1/24\nLinkLocalAddres
 printf '[Match]\nName=veth1\n[Network]\nLinkLocalAddressing=no\n' | sudo tee /etc/systemd/network/25-veth1.network
 sudo networkctl reload && ip -br a show veth0 && ip -br a show veth1
 ```
+
+Right after the reload both ends may still show `DOWN` without an address; a few seconds later `veth0` is `UP` with
+`198.51.100.1/24` and `veth1` is `UP` without an address.
 
 Automatic upgrades are turned off because they once upgraded `libc6` and `systemd` in the middle of a deploy
 ([deployment error page](../deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md)).
@@ -252,7 +257,11 @@ the `PLAY RECAP`.
 
 ### 6. Verify
 
+The client is installed through the proxy, like everything else. In a new shell, export it again first:
+
 ```bash
+source ~/kolla-venv/bin/activate
+export https_proxy=http://192.0.2.10:3128 no_proxy=192.0.2.25,localhost,127.0.0.1
 pip install python-openstackclient -c https://releases.openstack.org/constraints/upper/2026.1
 . /etc/kolla/admin-openrc.sh
 openstack compute service list      # nova-scheduler, nova-conductor, nova-compute: up
@@ -263,7 +272,6 @@ openstack network agent list        # DHCP, Open vSwitch, Metadata, L3 agents: a
 > router in the lab's own OpenStack; the commands after it create an instance and a floating IP.
 
 ```bash
-export https_proxy=http://192.0.2.10:3128 no_proxy=192.0.2.25,localhost,127.0.0.1
 export DEMO_NET_CIDR=203.0.113.0/24 DEMO_NET_GATEWAY=203.0.113.1
 export EXT_NET_CIDR=198.51.100.0/24 EXT_NET_RANGE=start=198.51.100.100,end=198.51.100.199 EXT_NET_GATEWAY=198.51.100.1
 ~/kolla-venv/share/kolla-ansible/init-runonce
@@ -271,14 +279,15 @@ export EXT_NET_CIDR=198.51.100.0/24 EXT_NET_RANGE=start=198.51.100.100,end=198.5
 openstack server create --image cirros --flavor m1.tiny --key-name mykey --network demo-net --wait demo1
 FIP=$(openstack floating ip create public1 -f value -c floating_ip_address)
 openstack server add floating ip demo1 $FIP
+sleep 30                     # the instance is still booting: a ping at once got no answer
 ping -c3 $FIP
 ssh -i ~/.ssh/id_ecdsa cirros@$FIP uname -a
 sudo docker exec nova_libvirt sh -c 'virsh dumpxml $(virsh list --name | head -1)' | grep "domain type"   # kvm
 kolla-ansible check -i ~/all-in-one
 ```
 
-On the reference build: 31 containers running, the instance under KVM, ping and SSH through the floating IP
-working, Horizon answering on `http://192.0.2.25/`, and `kolla-ansible check` with `failed=0`.
+On the reference build: 31 containers running (35 on the second build), the instance under KVM, ping and SSH through
+the floating IP working, Horizon answering on `http://192.0.2.25/`, and `kolla-ansible check` with `failed=0`.
 
 ### Delete the lab
 
@@ -355,8 +364,14 @@ rm -rf ~/.lab/<lab-vm>
 
 ## Validity and limits
 
-Built once, on 2026-10-21, with OpenStack 2026.1, Kolla-Ansible 22.2.0, ansible-core 2.20.10, images
-`2026.1-ubuntu-noble`, Docker and Open vSwitch, on Ubuntu 24.04 inside one particular hosting cloud with nested KVM.
+Built twice: on 2026-10-21, and on 2026-10-24 by following this page from step 1 on a new VM, with the
+corrections now in it (the image name, the proxy before `pip` in step 6, the wait before the ping). The second build
+met neither of the errors above, since the page already avoids them: `bootstrap-servers` 2.5 min, `prechecks` 36 s,
+`pull` 17.7 min, `deploy` 22 min (`failed=0`, the expected MariaDB `...ignoring`), about 52 minutes of machine time
+from step 1 to the end of step 6; `kolla-ansible check` `failed=0`, the instance under KVM, ping and SSH through
+its floating IP, Horizon answering. Both builds used OpenStack 2026.1, Kolla-Ansible 22.2.0, ansible-core 2.20.10,
+images `2026.1-ubuntu-noble`, Docker and Open vSwitch, on Ubuntu 24.04 inside one particular hosting cloud with
+nested KVM.
 Not tried: OVN, Podman, Cinder, other distributions, `qemu`, a deploy straight from quay.io, or Kolla-Ansible run
 from the deploy host instead of the node. This is a learning lab, not a pattern for anything that must stay up.
 
