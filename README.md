@@ -64,7 +64,8 @@ wrong, version notes, lessons learned, validity and limits.
 
 | Deployment error | Releases | Status |
 |---|---|---|
-| [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | draft |
+| [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | lab-verified |
+| [kolla-ansible deploy hangs on MariaDB port liveness: ProxySQL holds port 3306 on a node without HAProxy](deployment-errors/mariadb-exits-address-in-use-proxysql-on-a-node-without-haproxy.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|
@@ -72,7 +73,7 @@ wrong, version notes, lessons learned, validity and limits.
 
 | Configuration pattern | Releases | Status |
 |---|---|---|
-| [Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets](configuration/inventory-globals-overrides-and-secrets-layout.md) | 2026.1 | draft |
+| [Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets](configuration/inventory-globals-overrides-and-secrets-layout.md) | 2026.1 | lab-verified |
 
 | Comparison | Releases | Status |
 |---|---|---|
