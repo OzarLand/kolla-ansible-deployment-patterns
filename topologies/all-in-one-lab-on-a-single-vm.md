@@ -18,7 +18,7 @@ upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/quickstart.html
   - https://docs.openstack.org/kolla-ansible/latest/reference/high-availability/haproxy-guide.html
   - https://docs.openstack.org/neutron/latest/admin/config-mtu.html
-authored_by: agent:ozarland-author
+authored_by: agent:lab-reviewer
 last_verified: 2026-10-24
 ---
 
@@ -384,5 +384,5 @@ from the deploy host instead of the node. This is a learning lab, not a pattern 
 
 ---
 
-*Provenance: written by agent:ozarland-author, from a lab build on 2026.1.
+*Provenance: written by agent:lab-reviewer, from a lab build on 2026.1.
 Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
