@@ -11,7 +11,7 @@ environment:
   network: any
   storage: lvm, ceph-rbd (external), nfs
   os: any supported by Kolla-Ansible 2026.1
-risk: state-changing
+risk: destructive
 confirmed_by:
   - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, all-in-one", date: 2026-10-24, note: "LVM part only: deployed with the snippet, corrected; Ceph and NFS not run" }
 upstream_refs:
@@ -87,7 +87,18 @@ From the Glance guide:
 Every choice also needs `enable_cinder: "yes"`: its 2026.1 default is `false`, and a back-end setting alone deploys
 no Cinder at all (observed on a lab with the LVM setting: `deploy` ended with `failed=0` and no Cinder container).
 
-LVM, with the volume group created on each storage host beforehand:
+LVM, with the volume group created on each storage host beforehand. First check that `<disk>` is the empty disk
+meant for Cinder:
+
+```bash
+lsblk -f /dev/<disk>            # no partitions, no filesystem, no mount point
+sudo wipefs -n /dev/<disk>      # -n: only lists signatures, changes nothing; expected: no output
+```
+
+> 🛑 **Destructive.** `pvcreate` writes an LVM label on the device: whatever it held (a filesystem, a partition
+> table, another volume group) is no longer usable, and its data is lost. Precondition: `lsblk -f` and
+> `wipefs -n` above show an empty device, and it is the disk meant for Cinder on this host. Undo, while no volume
+> exists yet: `sudo vgremove cinder-volumes && sudo pvremove /dev/<disk>`; the earlier content does not come back.
 
 ```bash
 sudo pvcreate /dev/<disk> && sudo vgcreate cinder-volumes /dev/<disk>   # the name cinder_volume_group expects
@@ -198,8 +209,12 @@ Written from Kolla-Ansible 2026.1 (Cinder guide, external Ceph guide, Glance gui
 The LVM part was applied on an all-in-one lab on 2026-10-24 (OpenStack 2026.1, Kolla-Ansible 22.2.0, a 20 GB disk
 for `cinder-volumes`):
 
-- **Deployment.** `cinder-api`, `cinder-scheduler`, `cinder-volume` (`<host>@lvm-1`), `tgtd` and `iscsid` were
-  deployed, as the side-by-side table says.
+- **Deployment.** `cinder-api`, `cinder-scheduler`, `cinder-volume` (`<host>@lvm-1`), `cinder-backup`, `tgtd` and
+  `iscsid` were deployed, as the side-by-side table says.
+- **`cinder-backup`.** With `cinder_backup_driver: "nfs"` and no `cinder_backup_share`, it was deployed and `down`
+  (see [What to set, per choice](#what-to-set-per-choice)). Set to `enable_cinder_backup: "no"` afterwards, it was
+  left running and registered until removed with the commands given there. A backup to a working target was not
+  tried.
 - **Inventory.** The all-in-one inventory has the 2026.1 groups the Version notes describe (`cinder-volume-lvm` and
   `cinder-backup-lvm` children of `storage`, `iscsid` in `compute` and `storage`).
 - **Read-only checks.** Worked as written. The pool reported `storage_protocol='iSCSI'` and
