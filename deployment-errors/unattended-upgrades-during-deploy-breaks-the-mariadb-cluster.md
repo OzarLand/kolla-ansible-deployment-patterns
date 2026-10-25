@@ -1,7 +1,7 @@
 ---
 title: kolla-ansible deploy fails part-way, a container never starts and MariaDB never forms its cluster, because Ubuntu upgraded packages during the deploy
 kind: runbook
-status: draft
+status: lab-verified
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, mariadb, docker, systemd]
 deployment_methods: [kolla-ansible]
@@ -11,12 +11,13 @@ environment:
   storage: local
   os: ubuntu-24.04 (noble), docker
 risk: destructive
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, all-in-one", date: 2026-10-25, note: "an unattended upgrade run during a MariaDB deploy: systemd re-executed and needrestart restarted the Kolla units; prevention, mariadb-recovery and verification run; the Galera symptom needs several controllers and was not reproduced" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/quickstart.html
   - https://help.ubuntu.com/community/AutomaticSecurityUpdates
 authored_by: agent:ozarland-author
-last_verified: 2026-10-21
+last_verified: 2026-10-25
 ---
 
 # kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy
@@ -43,8 +44,8 @@ degraded.
 On each host that failed:
 
 ```bash
-# Did apt upgrade packages during the deploy window?
-grep -E "^Start-Date|^Upgrade" /var/log/apt/history.log | tail -20
+# Did apt upgrade packages during the deploy window, and which command did it?
+grep -E "^Start-Date|^Commandline|^Upgrade" /var/log/apt/history.log | tail -30
 # Which automatic runs are scheduled, and when did they last run?
 systemctl list-timers apt-daily.timer apt-daily-upgrade.timer
 # Is unattended-upgrades enabled?
@@ -54,7 +55,9 @@ journalctl --since "<deploy start>" | grep -iE "reexecut|Reloading|unattended-up
 ```
 
 An `Upgrade:` line in the apt history inside the deploy window, listing `libc6`, `systemd` or other base packages,
-confirms this runbook.
+with `Commandline: /usr/bin/unattended-upgrade`, confirms this runbook. Other lines are expected too:
+`bootstrap-servers` runs `apt-get install` itself (on a lab it upgraded `dpkg` and `libbz2-1.0` that way), so read
+the `Commandline:` before blaming unattended upgrades.
 
 ## Diagnosis
 
@@ -64,6 +67,14 @@ an upgrade of `libc6` and `systemd` makes systemd re-execute and restart several
 Kolla-Ansible is creating and starting containers. In the lab, one container was never started and MariaDB never
 formed its cluster. We believe the restarts hit the hosts while Galera was bootstrapping; the exact sequence was not
 traced.
+
+On Ubuntu 24.04 the `needrestart` package, installed on the cloud image, restarts the services that use upgraded
+libraries at the end of the run, Kolla-Ansible's container units included. Reproduced on an all-in-one lab: during a
+`kolla-ansible deploy --tags mariadb`, a manual `unattended-upgrade` re-executed systemd twice, restarted
+`containerd`, and stopped and started the `kolla-*-container.service` units (`Stopping
+kolla-mariadb-container.service` in `journalctl`). 39 of the 40 containers restarted within three minutes. There, the
+deploy had ended 53 s before the restarts and every container came back by itself; on a deploy still running, or on
+several controllers bootstrapping Galera, the restarts land in the middle of it.
 
 Kolla-Ansible's `bootstrap-servers` (2026.1, `ansible-collection-kolla`) does not change the automatic upgrade
 settings of the hosts, so nothing prevents this.
@@ -126,10 +137,28 @@ What an operator would do, not observed here:
 
 ```bash
 systemctl list-timers apt-daily.timer apt-daily-upgrade.timer    # both inactive, or scheduled in a window you chose
-docker ps --filter "status=restarting" --format '{{.Names}}'      # empty, on every host
-docker exec mariadb mysql -uroot -p -e "SHOW STATUS LIKE 'wsrep_cluster_size'; SHOW STATUS LIKE 'wsrep_cluster_status';"
+sudo docker ps --filter "status=restarting" --format '{{.Names}}'      # empty, on every host
+sudo docker exec -it mariadb mariadb -uroot -p \
+  -e "SHOW STATUS LIKE 'wsrep_cluster_size'; SHOW STATUS LIKE 'wsrep_cluster_status';"
+# the password is database_password in passwords.yml
 # expected: the number of controllers, and Primary
 ```
+
+## Lab observations
+
+On an all-in-one lab (OpenStack 2026.1, Kolla-Ansible 22.2.0, Ubuntu 24.04 cloud image with 195 pending updates,
+`libc6` and `systemd` among them):
+
+| Step | Observed |
+|---|---|
+| `unattended-upgrade` started by hand, then `kolla-ansible deploy --tags mariadb` with the `mariadb` container removed | Deploy `failed=0` in 133 s. The upgrade ran 23 minutes (73 apt runs) |
+| Quick checks | `history.log`: `Upgrade:` lines with `libc6`, under `Commandline: /usr/bin/unattended-upgrade -v`, and earlier ones from `bootstrap-servers`. `journalctl`: `Reexecuting` twice. Timers and `20auto-upgrades` as the page says |
+| Effect | `needrestart` restarted `containerd` and the Kolla container units: 39 of 40 containers restarted, all came back |
+| Prevention | As written: timers disabled, `no apt run queued` |
+| `mariadb-recovery`, with the data volume copied aside first (2.3 GB; `grastate.dat` `seqno: 6073`, `safe_to_bootstrap: 1`) | As written: `failed=0` in 112 s, MariaDB back, the platform's services up |
+| Verification | Needed `sudo` for `docker`, and the `mariadb` client: `mysql` is not in the 2026.1 MariaDB 11.4 image. Then `wsrep_cluster_size` 1, `Primary` |
+
+Not reproduced: Galera failing to form across several controllers, which needs a multinode lab.
 
 ## Validity and limits
 
