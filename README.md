@@ -41,7 +41,9 @@ topologies/        one pattern per topology, from all-in-one to large multinode
 networking/        network designs and their trade-offs
 storage/           storage designs and their trade-offs
 configuration/     inventory layouts, variable organisation, environment separation, secrets handling
+services/          one service or integration at a time: what to prepare, what to set, where it fails
 deployment-errors/ errors met during deploy/reconfigure/upgrade-prepare, cause and fix
+operations/        day-2 procedures on a running deployment: adding and removing hosts, backups, recoveries
 version-notes/     per Kolla-Ansible / OpenStack release: what changed that affects deployments
 comparisons/       side-by-side comparisons of patterns on one dimension (e.g. OVN vs OVS, Ceph vs LVM)
 templates/         deployment-pattern template
@@ -68,6 +70,11 @@ wrong, version notes, lessons learned, validity and limits.
 | [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | lab-verified |
 | [kolla-ansible deploy hangs on MariaDB port liveness: ProxySQL holds port 3306 on a node without HAProxy](deployment-errors/mariadb-exits-address-in-use-proxysql-on-a-node-without-haproxy.md) | 2026.1 | draft |
 | [kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client": Docker does not know the registry is plain HTTP](deployment-errors/pull-fails-http-response-to-https-client-insecure-registry.md) | 2026.1 | draft |
+| [kolla-ansible deploy times out at "Wait for haproxy to listen on VIP": the internal VIP never comes up, or cannot be reached](deployment-errors/deploy-times-out-waiting-for-haproxy-on-the-internal-vip.md) | 2026.1 | draft |
+
+| Operations | Releases | Status |
+|---|---|---|
+| [Adding a compute node to a running Kolla-Ansible deployment](operations/adding-a-compute-node.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|
@@ -78,12 +85,18 @@ wrong, version notes, lessons learned, validity and limits.
 |---|---|---|
 | [Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets](configuration/inventory-globals-overrides-and-secrets-layout.md) | 2026.1 | lab-verified |
 | [Rotating the secrets in passwords.yml. Which ones a reconfigure applies, which need manual steps, and which need an outage](configuration/rotating-secrets-in-passwords-yml.md) | 2026.1 | draft |
+| [CPU pinning, huge pages and NUMA on Kolla-Ansible computes. Host preparation, nova.conf overrides and the scheduler filter Kolla-Ansible does not enable](configuration/cpu-pinning-hugepages-and-numa-on-computes.md) | 2026.1 | draft |
 | [TLS on the internal and external endpoints. What each switch encrypts, where the certificates go, and what changes on a running platform](configuration/tls-on-internal-and-external-endpoints.md) | 2026.1 | draft |
+
+| Service or integration | Releases | Status |
+|---|---|---|
+| [Octavia with the amphora provider. Certificates, the management network and the amphora image](services/octavia-amphora-certificates-and-management-network.md) | 2026.1 | draft |
 
 | Comparison | Releases | Status |
 |---|---|---|
 | [ML2/OVS versus ML2/OVN with Kolla-Ansible. What changes in globals.yml, in operations and at upgrade time](comparisons/ml2-ovs-versus-ml2-ovn-with-kolla-ansible.md) | 2026.1 | draft |
 | [Single control node versus three controllers. What high availability really costs in Kolla-Ansible](comparisons/single-control-node-versus-three-controllers.md) | 2026.1 | draft |
+| [Separate network nodes versus network services on the controllers. What the network group decides in Kolla-Ansible](comparisons/separate-network-nodes-versus-network-services-on-controllers.md) | 2026.1 | draft |
 
 | Version notes | Releases | Status |
 |---|---|---|
