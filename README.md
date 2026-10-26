@@ -78,6 +78,7 @@ wrong, version notes, lessons learned, validity and limits.
 |---|---|---|
 | [Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets](configuration/inventory-globals-overrides-and-secrets-layout.md) | 2026.1 | lab-verified |
 | [Rotating the secrets in passwords.yml. Which ones a reconfigure applies, which need manual steps, and which need an outage](configuration/rotating-secrets-in-passwords-yml.md) | 2026.1 | draft |
+| [TLS on the internal and external endpoints. What each switch encrypts, where the certificates go, and what changes on a running platform](configuration/tls-on-internal-and-external-endpoints.md) | 2026.1 | draft |
 
 | Comparison | Releases | Status |
 |---|---|---|
