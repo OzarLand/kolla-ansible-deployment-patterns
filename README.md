@@ -42,6 +42,7 @@ networking/        network designs and their trade-offs
 storage/           storage designs and their trade-offs
 configuration/     inventory layouts, variable organisation, environment separation, secrets handling
 deployment-errors/ errors met during deploy/reconfigure/upgrade-prepare, cause and fix
+operations/        day-2 procedures on a running deployment: adding and removing hosts, backups, recoveries
 version-notes/     per Kolla-Ansible / OpenStack release: what changed that affects deployments
 comparisons/       side-by-side comparisons of patterns on one dimension (e.g. OVN vs OVS, Ceph vs LVM)
 templates/         deployment-pattern template
@@ -68,6 +69,10 @@ wrong, version notes, lessons learned, validity and limits.
 | [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | lab-verified |
 | [kolla-ansible deploy hangs on MariaDB port liveness: ProxySQL holds port 3306 on a node without HAProxy](deployment-errors/mariadb-exits-address-in-use-proxysql-on-a-node-without-haproxy.md) | 2026.1 | draft |
 | [kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client": Docker does not know the registry is plain HTTP](deployment-errors/pull-fails-http-response-to-https-client-insecure-registry.md) | 2026.1 | draft |
+
+| Operations | Releases | Status |
+|---|---|---|
+| [Adding a compute node to a running Kolla-Ansible deployment](operations/adding-a-compute-node.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|
