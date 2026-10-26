@@ -91,6 +91,7 @@ wrong, version notes, lessons learned, validity and limits.
 | Service or integration | Releases | Status |
 |---|---|---|
 | [Octavia with the amphora provider. Certificates, the management network and the amphora image](services/octavia-amphora-certificates-and-management-network.md) | 2026.1 | draft |
+| [Monitoring with Prometheus, Grafana and Alertmanager in Kolla-Ansible. What is deployed, and the rules, receivers and dashboards you still have to bring](services/monitoring-prometheus-grafana-and-alerting.md) | 2026.1 | draft |
 
 | Comparison | Releases | Status |
 |---|---|---|
