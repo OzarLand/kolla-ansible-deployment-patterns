@@ -41,7 +41,7 @@ incremental backup, and what to check, following the Kolla-Ansible 2026.1 guide 
 flowchart LR
   deploy[deploy host: kolla-ansible mariadb-backup] --> c1
   subgraph controllers
-    c1["controller-1: first host of the mariadb group, runs the mariabackup container"]
+    c1["controller-1: first host of the shard group, runs the mariabackup container"]
     c2[controller-2]
     c3[controller-3]
   end
@@ -57,7 +57,7 @@ Not affected. The backup container connects to the MariaDB server of its own hos
 ## Storage design
 
 - Backups land in the Docker volume `mariadb_backup` on the backup host only, by default the first host of the
-  `mariadb` group (`mariadb_backup_host`). On Docker, its files are under
+  shard group (`mariadb_backup_host`, `groups[mariadb_shard_group][0]`; with one shard, the first host of `mariadb`). On Docker, its files are under
   `/var/lib/docker/volumes/mariadb_backup/_data/`.
 - The volume is on the controller's own disk: plan its size (a full backup is about the size of the data, compressed)
   and copy every backup elsewhere. A backup that stays on the controller is lost with it.
@@ -73,7 +73,8 @@ enable_mariabackup: "yes"
 Then create the backup user and its grants on the running cluster:
 
 > ⚠️ **State-changing.** Writes the Mariabackup configuration on the backup host, and creates the backup database
-> user (`RELOAD`, `PROCESS`, `LOCK TABLES`, `BINLOG MONITOR`) and the `mariadb_backup_history` table. If the MariaDB
+> user (`RELOAD`, `PROCESS`, `LOCK TABLES`, `BINLOG MONITOR`) with rights on the `mariadb_backup_history` table,
+> which the backup tool itself creates on its first run. If the MariaDB
 > configuration changed since the last run, the MariaDB containers restart one by one. Undo: set
 > `enable_mariabackup` back to `"no"`; the user stays until you drop it.
 
@@ -134,7 +135,10 @@ mbstream -x -C /backup/restore/full/ < <full-backup-file>.qp.xbc.xbs
 mariabackup --prepare --target-dir /backup/restore/full
 ```
 
-For an incremental backup, extract it too and apply it after the first `--prepare` (the guide's second example):
+For incremental backups, extract each one and apply them in order, oldest first, after the first `--prepare`: one
+`--prepare --incremental-dir` per incremental (the guide's second example shows one). The guide's example also mounts
+`--tmpfs /backup/restore`; it is left out here on purpose, because step 3 runs in a second container that must still
+see `/backup/restore`.
 
 ```bash
 mkdir -p /backup/restore/inc
@@ -155,8 +159,8 @@ kolla-ansible stop -i <inventory> --tags mariadb --yes-i-really-really-mean-it
 **3. Replace the data on the first node.**
 
 > 🛑 **Destructive.** Deletes the current database files of the first node and copies the backup in their place.
-> Precondition: the current `mariadb` volume was copied aside (for example
-> `sudo cp -a /var/lib/docker/volumes/mariadb/_data <safe place>`), and step 2 stopped every node.
+> Precondition: the current `mariadb` volume of **every** MariaDB node was copied aside (for example
+> `sudo cp -a /var/lib/docker/volumes/mariadb/_data <safe place>` on each), and step 2 stopped every node.
 
 ```bash
 sudo docker run --rm -it --volumes-from mariadb --name dbrestore \
@@ -171,11 +175,30 @@ mariabackup --copy-back --target-dir /backup/restore/full
 **4. Start the database again.**
 
 - One MariaDB node: `sudo docker start mariadb`, then read `sudo docker logs mariadb`.
-- A Galera cluster: bootstrap it from the restored node. The other nodes rejoin and copy the data from it (a full
-  state transfer, as their own data is older).
+- A Galera cluster: bootstrap it from the restored node, after making the other nodes take a full copy from it.
 
-> 🛑 **Destructive.** Starts a new Galera cluster from the first node's data; the data of the other nodes is
-> replaced by it. Precondition: steps 1 to 3 succeeded on the node you name.
+Why the extra step: after a restore, the other nodes hold data that is **newer** than the backup, with their own
+`grastate.dat`. `mariadb-recovery` with `mariadb_recover_inventory_name` starts the named node with
+`--wsrep-new-cluster` and then starts the others as they are; nothing in the play clears their data
+(`recover_cluster.yml`). A node whose saved position is ahead of the new cluster's normally refuses to join (Galera
+reports that the states diverged) instead of taking a full state transfer (SST) by itself. The upstream guide does
+not cover this. Making each other node forget its state forces a full SST from the restored node. This step follows
+from how Galera works and from the role's code; it has not been observed on a lab for this page.
+
+> 🛑 **Destructive.** On every MariaDB node **except** the restored one: removes Galera's saved state, so that the
+> node discards its data and copies everything from the restored node when it joins. Its own newer data is lost
+> unless it was copied aside. Precondition: the `mariadb` volume of this node was copied aside (step 3's precondition,
+> done on every node), and every node is stopped (step 2). Undo: put the copy back.
+
+```bash
+# on each other MariaDB node
+sudo mv /var/lib/docker/volumes/mariadb/_data/grastate.dat /var/lib/docker/volumes/mariadb/_data/grastate.dat.before-restore
+```
+
+> 🛑 **Destructive.** Starts a new Galera cluster from the restored node's data; the other nodes join it with a full
+> state transfer and their data is replaced by it. Precondition: steps 1 to 3 succeeded on the node you name, and
+> the step above was done on every other node. If a node still refuses to join, read `docker logs mariadb` and
+> `/var/log/kolla/mariadb/mariadb.log` on it before doing anything else.
 
 ```bash
 kolla-ansible mariadb-recovery -i <inventory> -e mariadb_recover_inventory_name=<first-mariadb-host>
