@@ -193,12 +193,31 @@ Export dashboards as JSON from a Grafana instance, or take them from a published
 > balancer host**: the `loadbalancer` role's handlers stop and start it on the backup hosts first, then on the host
 > holding the VIPs, with keepalived stopped and started around it. This is not a hitless reload: every API behind the
 > internal and external VIPs is briefly interrupted, and OpenStack services see failed requests during that window.
-> Plan it like any `loadbalancer` change, in a window. OpenStack containers themselves are not restarted. Undo: set
-> the variables back to `"no"`; Kolla-Ansible does not remove the containers, so stop and remove them on each host;
-> removing the frontends restarts HAProxy the same way.
+> Plan it like any `loadbalancer` change, in a window. OpenStack containers themselves are not restarted. Undo: see
+> below; setting the variables back to `"no"` is not enough.
 
 ```bash
 kolla-ansible deploy -i <inventory> --tags common,loadbalancer,prometheus,grafana
+```
+
+**Undoing it.** Setting `enable_prometheus` and `enable_grafana` back to `"no"` removes neither the containers nor
+the HAProxy frontends. In 2026.1 the `haproxy-config` role writes `/etc/kolla/haproxy/services.d/<service>.cfg` only
+for enabled services and never deletes one, so the Grafana, Prometheus and Alertmanager frontends stay in HAProxy,
+with dead back-ends, on the external VIP too for Grafana and Alertmanager.
+
+> ⚠️ **State-changing.** Removes the monitoring containers and their frontends. The `reconfigure` restarts the
+> `haproxy` containers as described above, with the same brief interruption of every API. Precondition: the
+> variables are already `"no"`, so that the reconfigure does not write the fragments again. The Prometheus volume
+> stays on disk until you remove it.
+
+```bash
+# on each host running them: the containers of the Topology table that exist there
+sudo docker rm -f prometheus_server prometheus_alertmanager grafana     # or: sudo podman rm -f ...
+# on each load balancer host: the fragments of the disabled services
+ls /etc/kolla/haproxy/services.d/
+sudo rm /etc/kolla/haproxy/services.d/<fragment-of-a-disabled-service>.cfg
+# from the deployment host
+kolla-ansible reconfigure -i <inventory> --tags loadbalancer
 ```
 
 RabbitMQ metrics need one more step: the `rabbitmq` role writes the plugin into RabbitMQ's configuration, so the
