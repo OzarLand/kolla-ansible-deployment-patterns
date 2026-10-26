@@ -188,6 +188,7 @@ The deploy goes past *Waiting for nova-compute services to register themselves* 
 ## Related
 
 - [Adding a compute node to a running deployment](../operations/adding-a-compute-node.md)
+- [deploy times out at "Wait for haproxy to listen on VIP"](deploy-times-out-waiting-for-haproxy-on-the-internal-vip.md)
 - Kolla-Ansible 2026.1: [adding and removing hosts](https://docs.openstack.org/kolla-ansible/2026.1/user/adding-and-removing-hosts.html),
   [Nova guide](https://docs.openstack.org/kolla-ansible/2026.1/reference/compute/nova-guide.html)
 - Nova 2026.1: [cells v2](https://docs.openstack.org/nova/2026.1/admin/cells.html)
