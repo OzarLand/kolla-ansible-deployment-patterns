@@ -31,7 +31,8 @@ to get metrics for the whole platform without a separate monitoring project.
 
 What it does not give, in 2026.1, is what turns metrics into monitoring:
 
-- **no alert rules:** Prometheus loads only the `*.rules` files you put in `/etc/kolla/config/prometheus/`;
+- **no alert rules:** Prometheus loads only the `*.rules` files you put in `/etc/kolla/config/prometheus/`, and the
+  role copies them only while Alertmanager is enabled (`enable_prometheus_alertmanager`, on by default);
 - **no notification:** the default Alertmanager configuration routes every alert to a receiver with nothing in it;
 - **no dashboards:** Grafana provisions only the dashboards you put in `/etc/kolla/config/grafana/dashboards/`.
 
@@ -48,12 +49,14 @@ Group names are those of the 2026.1 sample multinode inventory, where `monitorin
 | `prometheus_node_exporter` | `monitoring`, `control`, `compute`, `network`, `storage` | Host metrics, port 9100 |
 | `prometheus_cadvisor` | same as node exporter | Container metrics, port 18080 |
 | `prometheus_openstack_exporter` | `monitoring` | Metrics from the OpenStack APIs (servers, agents, services) |
-| `prometheus_blackbox_exporter` | `monitoring` | Probes the public and internal endpoint of every enabled service |
+| `prometheus_blackbox_exporter` | `monitoring` | Probes the public endpoint of every enabled service, and its internal endpoint too when the internal and external VIPs differ (`kolla_same_external_internal_vip` false) |
 | `prometheus_mysqld_exporter`, `prometheus_memcached_exporter`, `prometheus_libvirt_exporter`, ... | where the service runs | One exporter per infrastructure service, each switched by its own `enable_prometheus_*_exporter` variable |
 | `grafana` | `grafana` | Dashboards, port 3000 |
 
 RabbitMQ metrics come from RabbitMQ's own Prometheus plugin, not from a separate container: the `rabbitmq` role
-enables it when `rabbitmq_enable_prometheus_plugin` is true, which follows `enable_prometheus`. Each Prometheus server
+enables it when `rabbitmq_enable_prometheus_plugin` is true, which follows `enable_prometheus`, and Prometheus scrapes
+it only when `enable_prometheus_rabbitmq_exporter` is true (default: `enable_prometheus` and `enable_rabbitmq`), even
+though no exporter container exists for it. Each Prometheus server
 scrapes every target on its own; HAProxy sends the internal endpoint to one of them at a time
 (`prometheus_active_passive: true` by default).
 
@@ -96,7 +99,8 @@ host when `monitoring` is the controllers.
       prometheus-alertmanager.yml     # replaces the whole Alertmanager configuration
       *.tmpl                          # Alertmanager notification templates, copied as they are
       prometheus.yml.d/*.yml          # merged into prometheus.yml: extra scrape jobs
-      <inventory_hostname>/...        # per-host versions of the two above
+      <inventory_hostname>/           # per-host prometheus.yml.d/, prometheus-alertmanager.yml, prometheus.yml,
+                                      #   web.yml, prometheus-blackbox-exporter.yml (not *.rules or *.tmpl)
       extras/                         # templated files referenced from prometheus.yml (file_sd targets)
     grafana/
       dashboards/*.json               # provisioned dashboards
@@ -185,8 +189,13 @@ Export dashboards as JSON from a Grafana instance, or take them from a published
 **2. Deploy** the monitoring roles and HAProxy:
 
 > ⚠️ **State-changing.** Creates the Prometheus, exporter and Grafana containers on every host of their groups, and
-> adds frontends to HAProxy (HAProxy reloads). OpenStack services are not restarted. Undo: set the variables back to
-> `"no"`; Kolla-Ansible does not remove the containers, so stop and remove them on each host.
+> adds HAProxy frontends for them. The new frontend configuration **restarts the `haproxy` container on every load
+> balancer host**: the `loadbalancer` role's handlers stop and start it on the backup hosts first, then on the host
+> holding the VIPs, with keepalived stopped and started around it. This is not a hitless reload: every API behind the
+> internal and external VIPs is briefly interrupted, and OpenStack services see failed requests during that window.
+> Plan it like any `loadbalancer` change, in a window. OpenStack containers themselves are not restarted. Undo: set
+> the variables back to `"no"`; Kolla-Ansible does not remove the containers, so stop and remove them on each host;
+> removing the frontends restarts HAProxy the same way.
 
 ```bash
 kolla-ansible deploy -i <inventory> --tags common,loadbalancer,prometheus,grafana
