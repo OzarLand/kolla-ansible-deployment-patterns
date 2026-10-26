@@ -17,7 +17,7 @@ Repository-specific notes:
 
 <!-- Anything specific to this repository: directory to use, naming of pages, extra fields. Keep it short. -->
 - Put a pattern in `topologies/`, a network or storage design in `networking/` or `storage/`, a layout in
-  `configuration/`, a solved deployment error in `deployment-errors/`, release-specific notes in `version-notes/`,
-  and side-by-side comparisons in `comparisons/`.
+  `configuration/`, a solved deployment error in `deployment-errors/`, a day-2 procedure in `operations/`,
+  release-specific notes in `version-notes/`, and side-by-side comparisons in `comparisons/`.
 - Name the file after the pattern or symptom, lowercase, hyphenated.
 - Add the page to the index table in `README.md` in the same pull request.
