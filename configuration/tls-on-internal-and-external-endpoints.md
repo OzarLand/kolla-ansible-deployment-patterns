@@ -3,7 +3,7 @@ title: TLS on the internal and external endpoints. What each switch encrypts, wh
 kind: pattern
 status: draft
 openstack_releases: ["2026.1"]
-components: [kolla-ansible, haproxy, keystone, docker]
+components: [kolla-ansible, haproxy, proxysql, mariadb, keystone, docker]
 deployment_methods: [kolla-ansible]
 environment:
   purpose: any; the generated test CA is for labs only
@@ -73,6 +73,9 @@ Not affected.
     haproxy-internal.pem            # internal: certificate + chain + key
     ca/                             # CA certificates copied into the containers (kolla_copy_ca_into_containers)
       <your-ca>.crt
+    proxysql-cert.pem, proxysql-key.pem   # database TLS through ProxySQL: needed as soon as internal TLS is on
+                                          # and ProxySQL is enabled (the default), see below
+    proxysql-ca.pem                 # optional: the intermediate that signed proxysql-cert.pem, if any
     backend-cert.pem, backend-key.pem               # backend TLS, used when nothing more specific exists
     <host>/<service>-cert.pem, <host>/<service>-key.pem   # most specific backend files win
 ```
@@ -94,6 +97,22 @@ The backend certificate is looked up in this order: `<host>/<service>-cert.pem`,
 `<service>-cert.pem`, then `kolla_tls_backend_cert`; the key in the same order. A certificate used for the backend must
 be valid for the address HAProxy uses to reach each host.
 
+**Internal TLS also turns on database TLS.** In 2026.1, `database_enable_tls_internal` follows
+`kolla_enable_tls_internal` whenever `enable_proxysql` is true, and `enable_proxysql` defaults to `enable_mariadb`
+(`ansible/group_vars/all/database.yml` and `proxysql.yml`). So on a default deployment, enabling internal TLS also:
+
+- makes the `loadbalancer` role copy `proxysql-cert.pem` and `proxysql-key.pem` from `/etc/kolla/certificates/`, and
+  `proxysql-ca.pem` if it exists (`tasks/copy-certs.yml`). The prechecks test only the HAProxy files, so a missing
+  ProxySQL file passes `prechecks` and fails the `reconfigure` in the `loadbalancer` role;
+- needs `proxysql-ca.pem` when the ProxySQL certificate is signed by an intermediate: a copy of that intermediate
+  (release note of bug 2150449);
+- appends `?ssl_ca=<openstack_cacert>` to every service's database connection: every service then connects to the
+  database over TLS and must trust its CA, so with a private CA `openstack_cacert` and
+  `kolla_copy_ca_into_containers` are required, not optional.
+
+`kolla-ansible certificates` generates the ProxySQL files too, which is why a lab using it does not show the gap.
+Backend TLS has the same link: `database_enable_tls_backend` follows `kolla_enable_tls_backend` with ProxySQL.
+
 Handle the private keys like `passwords.yml`: encrypted in the configuration repository, or kept out of it (see
 [laying out the configuration](inventory-globals-overrides-and-secrets-layout.md)).
 
@@ -105,7 +124,7 @@ Handle the private keys like `passwords.yml`: encrypted in the configuration rep
 | External TLS from day one | Add it later | Clients see HTTPS from the start; no endpoint change later | One certificate to renew per external name |
 | Internal TLS too | Plain HTTP inside | Service passwords and tokens cross the internal network on every call | Every service must trust the CA (`kolla_copy_ca_into_containers`, `openstack_cacert`); more files to renew |
 | Backend TLS | Stop at HAProxy | Encrypts the last hop, for networks where HAProxy and the API containers do not share a trusted segment | A certificate per host (and possibly per service); more to renew; `kolla_verify_tls_backend: false` exists but the guide does not recommend it |
-| Let's Encrypt (`enable_letsencrypt`) | Certificates managed by hand | Renewal every 12 hours by a Kolla-Ansible container, deployed to HAProxy over SSH | Needs an ACME server reachable from the controllers; internal certificates need an internal ACME server (`letsencrypt_internal_cert_server`) |
+| Let's Encrypt (`enable_letsencrypt`) | Certificates managed by hand | Renewal every 12 hours by a Kolla-Ansible container, deployed to HAProxy over SSH | Needs an ACME server reachable from the controllers; internal certificates need an internal ACME server (`letsencrypt_internal_cert_server`); HAProxy's socket then runs with admin access, which the guide notes |
 | `kolla_externally_managed_cert: true` | Kolla-Ansible copies the files | Certificates are put on the hosts by another tool | Kolla-Ansible no longer copies them; the other tool must put them on every host, in the place Kolla-Ansible expects |
 
 ### Enabling TLS on a running platform
@@ -115,13 +134,18 @@ Before: read-only checks of the certificate files on the deploy host.
 ```bash
 openssl x509 -in /etc/kolla/certificates/haproxy-internal.pem -noout -subject -enddate -ext subjectAltName
 openssl verify -CAfile /etc/kolla/certificates/ca/<your-ca>.crt /etc/kolla/certificates/haproxy-internal.pem
+# with an intermediate CA, pass it too: -untrusted <intermediate>.crt
+openssl x509 -in /etc/kolla/certificates/proxysql-cert.pem -noout -subject -enddate   # internal TLS with ProxySQL
 kolla-ansible prechecks -i <inventory>      # checks that the files named by kolla_*_fqdn_cert exist
 ```
 
 > ⚠️ **State-changing.** With `kolla_enable_tls_internal` or `kolla_enable_tls_external` switched on, a
 > `reconfigure` of the whole deployment rewrites HAProxy's configuration, the configuration of every service that
-> calls another one, and the endpoints in the Keystone catalogue (`http://` becomes `https://`). Every API container
-> restarts; API calls fail or are refused during the run, and clients that do not trust the CA fail afterwards.
+> calls another one, and the endpoints in the Keystone catalogue (`http://` becomes `https://`). With internal TLS
+> and ProxySQL (the default), every service's database connection also moves to TLS. Every API container
+> restarts; API calls fail or are refused during the run, and clients that do not trust the CA fail afterwards. The
+> internal VIP serves only HTTPS as soon as the `loadbalancer` play has run, before the services are reconfigured.
+> Endpoint URLs stored outside Kolla-Ansible (tenant Heat stacks, external tooling, monitoring) must be updated too.
 > Running instances are not affected. Do it in a maintenance window, after a configuration backup and a MariaDB
 > backup. Undo: set the switches back and run `reconfigure` again, which restores the `http://` endpoints the same way.
 
@@ -147,6 +171,9 @@ apply it to HAProxy:
 ```bash
 kolla-ansible reconfigure -i <inventory> --tags loadbalancer
 ```
+
+The ProxySQL certificate (`proxysql-cert.pem`, `proxysql-key.pem`, `proxysql-ca.pem`) is copied by the same
+`loadbalancer` role, so the same command renews it, with the same short interruption of database connections.
 
 A renewed backend certificate is copied by each service's role instead: run `reconfigure` with that service's tag
 (`--tags keystone`, `--tags nova`, and so on), with the same short interruption for that service.
@@ -186,7 +213,9 @@ Written against Kolla-Ansible 2026.1. The variable names and default paths are t
 - Written from the Kolla-Ansible 2026.1 TLS and ACME guides and the code of `ansible/roles/loadbalancer`
   (`copy-certs.yml`, `precheck.yml`) and `ansible/module_utils/kolla_docker_worker.py` (the configuration comparison
   that restarts a container whose files changed). Not run on a lab for this page. Status `draft`.
-- Not covered: TLS for MariaDB and RabbitMQ (`database_enable_tls_*`, `rabbitmq_enable_tls`), libvirt TLS, Octavia's
+- Database TLS is covered only as far as internal and backend TLS switch it on through ProxySQL (above); its
+  certificate rotation was not detailed.
+- Not covered: RabbitMQ TLS (`rabbitmq_enable_tls`), libvirt TLS, Octavia's
   own certificates (`kolla-ansible octavia-certificates`), and Podman.
 - The CA rotation order above follows from how trust works; it was not run.
 
