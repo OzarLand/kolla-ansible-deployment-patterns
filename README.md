@@ -61,6 +61,7 @@ wrong, version notes, lessons learned, validity and limits.
 | Networking pattern | Releases | Status |
 |---|---|---|
 | [Network interfaces, VLANs and MTU for a multinode deployment, with Open vSwitch and OVN side by side](networking/interfaces-vlans-and-mtu-ovs-and-ovn.md) | 2026.1 | draft |
+| [Provider networks with Kolla-Ansible. Instances directly on a flat or VLAN network, without tunnels or routers](networking/provider-networks-instances-on-flat-or-vlan-networks.md) | 2026.1 | draft |
 
 | Deployment error | Releases | Status |
 |---|---|---|
