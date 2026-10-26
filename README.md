@@ -74,6 +74,7 @@ wrong, version notes, lessons learned, validity and limits.
 | Operations | Releases | Status |
 |---|---|---|
 | [Adding a compute node to a running Kolla-Ansible deployment](operations/adding-a-compute-node.md) | 2026.1 | draft |
+| [Removing or replacing a compute node in a Kolla-Ansible deployment](operations/removing-or-replacing-a-compute-node.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|
