@@ -76,6 +76,7 @@ wrong, version notes, lessons learned, validity and limits.
 | Operations | Releases | Status |
 |---|---|---|
 | [Adding a compute node to a running Kolla-Ansible deployment](operations/adding-a-compute-node.md) | 2026.1 | draft |
+| [deploy, reconfigure, upgrade and the others. Which kolla-ansible command to run after a change, and how to narrow it with --limit and --tags](operations/deploy-reconfigure-upgrade-and-limiting-runs.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|
