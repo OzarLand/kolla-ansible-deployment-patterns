@@ -60,6 +60,12 @@ The guide's way: back up the file, empty the values to rotate, let `kolla-genpwd
 ```bash
 cp /etc/kolla/passwords.yml ./passwords.yml.bak       # keep it until the rotation is checked
 # in passwords.yml, change  foo: "old"  to  foo:   for each secret to rotate
+```
+
+> ⚠️ **State-changing.** `kolla-genpwd` rewrites `/etc/kolla/passwords.yml` in place, filling every empty value.
+> Nothing reaches the platform until a `reconfigure` or `deploy`. Undo: copy the backup back.
+
+```bash
 kolla-genpwd -p /etc/kolla/passwords.yml
 ```
 
@@ -103,21 +109,35 @@ for new RabbitMQ credentials takes time, so it recommends stopping everything an
 > services, because the RabbitMQ containers no longer exist.
 
 ```bash
-kolla-ansible stop -i <inventory>
+kolla-ansible stop -i <inventory> --yes-i-really-really-mean-it
 # on each RabbitMQ node
-docker stop rabbitmq
-docker rm rabbitmq
-docker volume rm rabbitmq
+sudo docker stop rabbitmq
+sudo docker rm rabbitmq
+sudo docker volume rm rabbitmq
 # then, from the deployment host
 kolla-ansible deploy -i <inventory>
 ```
 
+The upstream guide writes `kolla-ansible stop -i inventory` without `--yes-i-really-really-mean-it`. In 2026.1 that
+flag is required (`kolla_ansible/cli/commands.py`), and the command exits with an argument error without it.
+
 After the deploy, the guide flushes Memcached on every Memcached container: data stored under the old Memcached
-password can no longer be read. The address and port of each instance are after `-l` and `-p` in
-`/etc/kolla/memcached/config.json`; the guide sends `flush_all` to each one.
+password can no longer be read. From a host that reaches the Memcached network (a Memcached host, if unsure), with a
+telnet client installed:
+
+```bash
+# on every host running Memcached: the address after -l and the port after -p
+sudo grep command /etc/kolla/memcached/config.json
+```
 
 > ⚠️ **State-changing.** `flush_all` empties the cache, including cached tokens: services fetch them again, and the
 > first requests are slower. Nothing persistent is lost.
+
+```bash
+telnet <address> <port>
+flush_all
+quit
+```
 
 ## What went wrong during deployment
 
