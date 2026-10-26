@@ -52,7 +52,8 @@ Where instance disks live decides how instances leave the host (see
 
 - **shared storage (Ceph RBD, boot from volume):** live migration works while the host runs; evacuation rebuilds an
   instance elsewhere with its disk intact if the host is dead;
-- **local disks:** live migration copies the disk (block migration) while the host runs; if the host is dead,
+- **local disks:** live migration copies the disk (block migration, chosen automatically from compute API
+  microversion 2.25, which current clients negotiate: no `--block-migration` flag needed) while the host runs; if the host is dead,
   evacuation rebuilds the instance from its image and **its local disk is lost**.
 
 ## Inventory and configuration layout
@@ -98,7 +99,8 @@ openstack server list --all-projects --host <host>      # expected: empty
 **4. Stop the services on the host.**
 
 > ⚠️ **State-changing.** Stops every Kolla container on this host only. Precondition: step 3 left no instance on it.
-> Undo: `kolla-ansible deploy -i <inventory> --limit <host>`.
+> Undo: `kolla-ansible deploy -i <inventory> --limit <host>`. The operating guide advises against `--limit` in
+> general; this is the guide's own documented use of it.
 
 ```bash
 kolla-ansible stop -i <inventory> --yes-i-really-really-mean-it --limit <host>
@@ -132,7 +134,8 @@ The instances on it are down. Recovering them means evacuating them, which rebui
 > 🛑 **Destructive.** Evacuation rebuilds the instance on another host. With local disks, the disk is rebuilt from
 > the image: its data is lost. Precondition: the dead host is really down and **fenced** (powered off, or cut from the
 > storage and the network), otherwise the same instance can run twice and corrupt a shared disk. Nova must see the
-> service as `down` and the service must be forced down or disabled. Undo: none for the lost local data.
+> service as `down`: wait for its heartbeat to expire, or force it down (below); disabling it is not enough. Undo:
+> none for the lost local data.
 
 ```bash
 openstack compute service set --down <host> nova-compute     # after fencing; tells Nova at once
@@ -142,7 +145,9 @@ openstack server evacuate <server-id>                        # one instance at a
 Before running it in production, read Nova's *Evacuate instances* and *Recover from a failed compute node* guides.
 Then stop what is left of the host's containers if it is reachable (step 4), remove it from the inventory (step 5)
 and clean up its records (step 6). If the dead machine is later powered on with its old disks, keep it from starting
-`nova-compute` until it has been reinstalled or added again as a new host.
+`nova-compute` until it has been reinstalled or added again as a new host: at start-up, `nova-compute` deletes the
+local copies of instances that were evacuated from it (`_destroy_evacuated_instances`), which removes what could
+still be recovered from those disks.
 
 ## Replacing a compute node
 
