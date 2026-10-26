@@ -71,10 +71,12 @@ wrong, version notes, lessons learned, validity and limits.
 | [kolla-ansible deploy hangs on MariaDB port liveness: ProxySQL holds port 3306 on a node without HAProxy](deployment-errors/mariadb-exits-address-in-use-proxysql-on-a-node-without-haproxy.md) | 2026.1 | draft |
 | [kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client": Docker does not know the registry is plain HTTP](deployment-errors/pull-fails-http-response-to-https-client-insecure-registry.md) | 2026.1 | draft |
 | [kolla-ansible deploy times out at "Wait for haproxy to listen on VIP": the internal VIP never comes up, or cannot be reached](deployment-errors/deploy-times-out-waiting-for-haproxy-on-the-internal-vip.md) | 2026.1 | draft |
+| [kolla-ansible deploy fails with "The following Nova compute services failed to register themselves"](deployment-errors/nova-compute-services-failed-to-register.md) | 2026.1 | draft |
 
 | Operations | Releases | Status |
 |---|---|---|
 | [Adding a compute node to a running Kolla-Ansible deployment](operations/adding-a-compute-node.md) | 2026.1 | draft |
+| [deploy, reconfigure, upgrade and the others. Which kolla-ansible command to run after a change, and how to narrow it with --limit and --tags](operations/deploy-reconfigure-upgrade-and-limiting-runs.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|
@@ -86,10 +88,12 @@ wrong, version notes, lessons learned, validity and limits.
 | [Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets](configuration/inventory-globals-overrides-and-secrets-layout.md) | 2026.1 | lab-verified |
 | [Rotating the secrets in passwords.yml. Which ones a reconfigure applies, which need manual steps, and which need an outage](configuration/rotating-secrets-in-passwords-yml.md) | 2026.1 | draft |
 | [CPU pinning, huge pages and NUMA on Kolla-Ansible computes. Host preparation, nova.conf overrides and the scheduler filter Kolla-Ansible does not enable](configuration/cpu-pinning-hugepages-and-numa-on-computes.md) | 2026.1 | draft |
+| [TLS on the internal and external endpoints. What each switch encrypts, where the certificates go, and what changes on a running platform](configuration/tls-on-internal-and-external-endpoints.md) | 2026.1 | draft |
 
 | Service or integration | Releases | Status |
 |---|---|---|
 | [Octavia with the amphora provider. Certificates, the management network and the amphora image](services/octavia-amphora-certificates-and-management-network.md) | 2026.1 | draft |
+| [Monitoring with Prometheus, Grafana and Alertmanager in Kolla-Ansible. What is deployed, and the rules, receivers and dashboards you still have to bring](services/monitoring-prometheus-grafana-and-alerting.md) | 2026.1 | draft |
 | [Central logging with Fluentd and OpenSearch in Kolla-Ansible. Where logs go, how to search them by request ID, and how long they are kept](services/central-logging-fluentd-and-opensearch.md) | 2026.1 | draft |
 
 | Comparison | Releases | Status |
