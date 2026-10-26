@@ -125,7 +125,7 @@ What the instances still need from Neutron on a provider network:
   `enable_isolated_metadata = true` and `force_metadata = true`, so with ML2/OVS the DHCP namespace serves it; with
   OVN, the metadata agent on each host does.
 - **DNS servers:** the subnet's `--dns-nameserver`, or else Kolla-Ansible's `neutron_dnsmasq_dns_servers`, which
-  defaults to public resolvers (`1.1.1.1,8.8.8.8,8.8.4.4`), not reachable on an isolated network.
+  defaults to well-known public resolvers, not reachable on an isolated network.
 
 ## What went wrong during deployment
 
