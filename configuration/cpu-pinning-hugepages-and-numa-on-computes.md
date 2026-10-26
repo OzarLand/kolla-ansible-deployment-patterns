@@ -118,19 +118,22 @@ enabled_filters = ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,
 
 The first five are Nova's 2026.1 default; writing the option replaces the whole list, so keep them, and add any other
 filter you rely on (for example `PciPassthroughFilter` with PCI passthrough or SR-IOV, `AggregateInstanceExtraSpecsFilter`
-for aggregates matched by extra specs).
+for aggregates matched by extra specs). With `enable_blazar`, Kolla-Ansible's own list adds `BlazarFilter`; this
+override would drop it, so add it back.
 
 For the computes, the Nova guide's example for a host with 24 cores and hyper-threading (48 logical CPUs): one core
 and its sibling for the host, 8 cores and their siblings for pinned instances, the rest shared:
 
 ```ini
 # /etc/kolla/config/nova/nova-compute.conf
+{% if nova_cpu_dedicated_set is defined %}
 [DEFAULT]
 reserved_host_memory_mb = {{ nova_reserved_host_memory_mb }}
 
 [compute]
 cpu_dedicated_set = {{ nova_cpu_dedicated_set }}
 cpu_shared_set = {{ nova_cpu_shared_set }}
+{% endif %}
 ```
 
 ```yaml
@@ -140,9 +143,9 @@ nova_cpu_shared_set: "18-47"
 nova_reserved_host_memory_mb: 8192
 ```
 
-If every compute gets the file but only some are in `compute-pinned`, the template fails on the others for an
-undefined variable; either put the defaults in `group_vars/compute.yml` or wrap the lines in
-`{% if nova_cpu_dedicated_set is defined %}`. The CPU numbers are the host's logical CPU IDs: with hyper-threading,
+Every compute gets this file. The `{% if %}` wrapper leaves it empty on the computes outside `compute-pinned`, where
+the variables are undefined; without it the template fails there. Do not give the variables empty defaults instead:
+that would render `cpu_dedicated_set = ` on unpinned hosts. The CPU numbers are the host's logical CPU IDs: with hyper-threading,
 check which IDs are siblings (`lscpu -e`) so that a core and its sibling land in the same set.
 
 ### Flavors
@@ -211,7 +214,7 @@ sudo docker exec nova_libvirt virsh dumpxml <domain> | grep -A3 -E "hugepages|nu
 
 | Choice | Alternative(s) | Why this one here | Consequence in operation |
 |---|---|---|---|
-| Overrides with inventory variables | One directory per host under `config/nova/<host>/` | Many hosts share one CPU layout; the guide documents variables in overrides | A missing variable fails the template; keep defaults in `group_vars/compute.yml` |
+| Overrides with inventory variables | One directory per host under `config/nova/<host>/` | Many hosts share one CPU layout; the guide documents variables in overrides | A missing variable fails the template; guard the lines with `{% if ... is defined %}` |
 | `cpu_dedicated_set` and `cpu_shared_set` on the same hosts | Separate pinned-only hosts | Since Train, Nova tracks `PCPU` and `VCPU` separately | `PCPU` and `VCPU` allocations count together in the `cores` quota (Nova guide) |
 | Huge pages at boot | At run time | The guide: run-time allocation can fail when memory is fragmented | A reboot per host; that memory is reserved even with no huge-page instance running |
 | `NUMATopologyFilter` added | Nova's default filters | Required by the Nova guide whenever NUMA awareness is used | One more filter for every request; it does nothing for instances without a NUMA topology |
