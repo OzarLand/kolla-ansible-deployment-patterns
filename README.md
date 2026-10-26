@@ -41,6 +41,7 @@ topologies/        one pattern per topology, from all-in-one to large multinode
 networking/        network designs and their trade-offs
 storage/           storage designs and their trade-offs
 configuration/     inventory layouts, variable organisation, environment separation, secrets handling
+services/          one service or integration at a time: what to prepare, what to set, where it fails
 deployment-errors/ errors met during deploy/reconfigure/upgrade-prepare, cause and fix
 operations/        day-2 procedures on a running deployment: adding and removing hosts, backups, recoveries
 version-notes/     per Kolla-Ansible / OpenStack release: what changed that affects deployments
@@ -85,6 +86,10 @@ wrong, version notes, lessons learned, validity and limits.
 | [Laying out the configuration. Inventory, globals.yml, per-service overrides and passwords.yml, kept in git without secrets](configuration/inventory-globals-overrides-and-secrets-layout.md) | 2026.1 | lab-verified |
 | [Rotating the secrets in passwords.yml. Which ones a reconfigure applies, which need manual steps, and which need an outage](configuration/rotating-secrets-in-passwords-yml.md) | 2026.1 | draft |
 | [CPU pinning, huge pages and NUMA on Kolla-Ansible computes. Host preparation, nova.conf overrides and the scheduler filter Kolla-Ansible does not enable](configuration/cpu-pinning-hugepages-and-numa-on-computes.md) | 2026.1 | draft |
+
+| Service or integration | Releases | Status |
+|---|---|---|
+| [Octavia with the amphora provider. Certificates, the management network and the amphora image](services/octavia-amphora-certificates-and-management-network.md) | 2026.1 | draft |
 
 | Comparison | Releases | Status |
 |---|---|---|
