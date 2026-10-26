@@ -68,6 +68,7 @@ wrong, version notes, lessons learned, validity and limits.
 | [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | lab-verified |
 | [kolla-ansible deploy hangs on MariaDB port liveness: ProxySQL holds port 3306 on a node without HAProxy](deployment-errors/mariadb-exits-address-in-use-proxysql-on-a-node-without-haproxy.md) | 2026.1 | draft |
 | [kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client": Docker does not know the registry is plain HTTP](deployment-errors/pull-fails-http-response-to-https-client-insecure-registry.md) | 2026.1 | draft |
+| [kolla-ansible deploy times out at "Wait for haproxy to listen on VIP": the internal VIP never comes up, or cannot be reached](deployment-errors/deploy-times-out-waiting-for-haproxy-on-the-internal-vip.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|
