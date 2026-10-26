@@ -195,6 +195,7 @@ current clients negotiate.
 ## Related
 
 - [Adding a compute node](adding-a-compute-node.md)
+- [deploy, reconfigure, upgrade and the others](deploy-reconfigure-upgrade-and-limiting-runs.md): what `stop` and `--limit` do
 - [Where instance disks live](../storage/nova-instance-disks-local-ceph-rbd-or-boot-from-volume.md)
 - Kolla-Ansible 2026.1: [adding and removing hosts](https://docs.openstack.org/kolla-ansible/2026.1/user/adding-and-removing-hosts.html)
 - Nova 2026.1: [live migration](https://docs.openstack.org/nova/2026.1/admin/live-migration-usage.html),
