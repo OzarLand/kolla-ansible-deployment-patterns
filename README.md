@@ -70,6 +70,7 @@ wrong, version notes, lessons learned, validity and limits.
 | Storage pattern | Releases | Status |
 |---|---|---|
 | [Cinder and Glance back-ends compared. LVM, Ceph RBD and NFS, and what each choice implies](storage/cinder-and-glance-backends-compared-lvm-ceph-nfs.md) | 2026.1 | draft |
+| [Where instance disks live. Local on each compute, in Ceph RBD, or boot from volume](storage/nova-instance-disks-local-ceph-rbd-or-boot-from-volume.md) | 2026.1 | draft |
 
 | Configuration pattern | Releases | Status |
 |---|---|---|
