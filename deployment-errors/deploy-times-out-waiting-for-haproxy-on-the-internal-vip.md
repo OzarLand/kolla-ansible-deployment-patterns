@@ -43,7 +43,9 @@ come on every host or only on some of them.
 On a first deployment, nothing else is deployed: every service after the load balancer reaches the database and
 Keystone through the VIP. On a running platform (`reconfigure` or `upgrade`), the internal VIP may be down or held by
 several hosts at once, and every API call and every service-to-service call through the VIP fails or flaps until
-it is fixed. Instances keep running; their data plane does not go through the VIP.
+it is fixed. Instances keep running and their data plane does not go through the VIP, but their metadata requests
+do: the Neutron metadata agents reach `nova-metadata` through the internal endpoint, so cloud-init on instances that
+boot or reboot meanwhile fails.
 
 ## Quick checks
 
@@ -78,14 +80,15 @@ Kolla-Ansible puts keepalived and HAProxy on every host of the `loadbalancer` gr
 VRRP: every keepalived starts as `BACKUP`, the highest priority one becomes `MASTER` and announces itself with VRRP
 advertisements (multicast by default, `keepalived_traffic_mode: multicast`). A track script (`check_alive`, enabled by
 default with `keepalived_track_script_enabled`) checks HAProxy through its socket: a host whose HAProxy does not
-answer goes to `FAULT` and does not take the VIP.
+answer goes to `FAULT` and does not take the VIP. The instances are configured with `nopreempt`: a host that comes
+back does not take the VIP back from the current `MASTER`.
 
 So the wait fails for one of three reasons, which the quick checks tell apart:
 
 | What the checks show | Meaning |
 |---|---|
 | No host holds the VIP; keepalived logs `FAULT` or the check script failing; HAProxy restarting or not listening | HAProxy does not run, so no keepalived takes the VIP (cause 1) |
-| More than one host holds the VIP; each keepalived logs `Entering MASTER STATE` | The keepalived instances do not hear each other's VRRP advertisements (cause 2) |
+| More than one host holds the VIP; each keepalived logs that it entered the `MASTER` state | The keepalived instances do not hear each other's VRRP advertisements (cause 2) |
 | keepalived logs about advertisements from an unexpected source, or a VRID/password mismatch | Another VRRP cluster uses the same virtual router ID on that network (cause 3) |
 | One host holds the VIP, HAProxy listens, but the other hosts cannot reach the VIP | The network does not deliver traffic to the VIP address (cause 4) |
 
@@ -108,6 +111,12 @@ certificate when `kolla_enable_tls_internal` or `kolla_enable_tls_external` is s
 `kolla_internal_fqdn_cert` and `kolla_external_fqdn_cert`, but only if they were run). With the track script, keepalived
 then refuses the VIP everywhere. Tell it apart: `docker ps` shows `haproxy` restarting, and its log names the error.
 
+A variant on the hosts that do not hold the VIP: HAProxy binds the VIP address even where it is not configured, which
+needs `net.ipv4.ip_nonlocal_bind=1` (and `net.ipv6.ip_nonlocal_bind=1`). Kolla-Ansible sets these in the
+`loadbalancer` role only when `set_sysctl` is true (the default). With `set_sysctl: false` and the sysctls not set by
+other means, HAProxy cannot bind and exits on those hosts. Tell it apart: `sysctl net.ipv4.ip_nonlocal_bind` returns
+`0`, and the HAProxy log says it cannot bind the VIP address.
+
 ### Cause 2: VRRP advertisements do not pass between the load balancer hosts
 
 Every keepalived believes it is alone and takes the VIP: a split brain. Seen when multicast is filtered between the
@@ -129,7 +138,9 @@ The VIP is up on one host and HAProxy listens, but packets to the VIP do not arr
 - the hosts are instances of another OpenStack cloud and port security drops traffic for an address that is not the
   port's own: the VIP must be in the *allowed address pairs* of every load balancer host's port;
 - `kolla_internal_vip_address` is not in the subnet of `api_interface` (keepalived adds it to that interface, but
-  nothing routes it there).
+  nothing routes it there). On a first deployment, `kolla-ansible prechecks` catches this: its check *Checking if
+  kolla_internal_vip_address is in the same network as api_interface on all nodes* runs as long as no keepalived
+  container exists yet. On a running platform it no longer runs.
 
 Tell it apart: from another host, ARP for the VIP gets no answer, or gets one but the TCP connection never completes.
 
@@ -174,14 +185,15 @@ Then check that only one host holds the VIP.
 
 ### For cause 3
 
-Choose an ID from 0 to 255 that no other VRRP cluster uses on that network, and set it in `globals.yml`:
+Choose an ID from 1 to 255 (the VRRP range, RFC 5798) that no other VRRP cluster uses on that network, and set it in `globals.yml`:
 
 ```yaml
 keepalived_virtual_router_id: "<unique-id>"
 ```
 
 > ⚠️ **State-changing.** Same effect as for cause 2: keepalived and HAProxy restart on the load balancer hosts and the
-> VIP moves once. Coordinate with whoever runs the other cluster if it is in production too.
+> VIP moves once. Coordinate with whoever runs the other cluster if it is in production too. Undo: the previous
+> value and the same command.
 
 ```bash
 kolla-ansible reconfigure -i <inventory> --tags loadbalancer
