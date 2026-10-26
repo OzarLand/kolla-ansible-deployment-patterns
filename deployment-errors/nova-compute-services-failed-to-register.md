@@ -16,7 +16,7 @@ upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/user/adding-and-removing-hosts.html
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/compute/nova-guide.html
   - https://docs.openstack.org/nova/2026.1/admin/cells.html
-  - https://docs.openstack.org/nova/2026.1/admin/troubleshooting/troubleshooting.html
+  - https://docs.openstack.org/nova/2026.1/admin/support-compute.html
 authored_by: agent:ozarland-author
 last_verified: 2026-10-26
 ---
@@ -45,6 +45,13 @@ name after the colon is the host's node name (`ansible_facts.nodename`), which m
 The host is not added to Nova: no instance can be scheduled on it, and the host discovery step
 (`nova-manage cell_v2 discover_hosts`) has not run for it. The other hosts of the run are not failed unless
 `nova_compute_registration_fatal` is true. Running instances elsewhere are not affected.
+
+The wait and the discovery run once per batch, on the first compute of the batch. If that host is the one that failed,
+`discover_hosts` is skipped for every new compute of the run, including those that did register: run the deploy again
+once the cause is fixed.
+
+This error is only about a service that never appeared. A compute that registered earlier and is now `down` does not
+produce it: the wait counts registered services, up or down.
 
 ## Quick checks
 
@@ -84,8 +91,12 @@ which:
 |---|---|
 | `Connection to libvirt failed` | libvirt (cause 1) |
 | `AMQP server on <address>:5672 is unreachable` | RabbitMQ (cause 2) |
-| The service starts normally, and `openstack compute service list` shows the host under another name | a host name mismatch (cause 3) |
-| Errors about the placement API or Keystone (connection refused, `401`, certificate errors) | the API endpoints from the compute (cause 4) |
+| The service starts normally, and `openstack compute service list` shows the host under another name, or Nova stops at start-up on a detected host rename | a host name mismatch (cause 3) |
+
+Errors about the placement API or Keystone (connection refused, `401`, certificate errors) do **not** cause this
+failure: in Nova 2026.1 the compute service record is created after `init_host`, whose only Placement call logs
+Keystone client errors and carries on. Such a compute registers and passes the wait, but then has no resource
+provider and receives no instances. That is a different problem, not covered here.
 
 `nova-compute` logs to `/var/log/kolla/nova/nova-compute.log` (Kolla's `log_dir`); `docker logs nova_compute` shows
 the container's start-up. libvirt logs to `/var/log/kolla/libvirt/` and `docker logs nova_libvirt`.
@@ -94,14 +105,16 @@ the container's start-up. libvirt logs to `/var/log/kolla/libvirt/` and `docker 
 
 ### Cause 1: nova-compute cannot connect to libvirt
 
-`nova_libvirt` is not running or restarts, often because hardware virtualisation is missing (no `/dev/kvm`, nested
-virtualisation off on a lab VM) or because a libvirt on the host itself holds the socket. Tell it apart: `docker ps`
-shows `nova_libvirt` restarting, or the log line above.
+`nova_libvirt` is not running or restarts, or a libvirt installed on the host itself holds the socket
+`/run/libvirt/libvirt-sock` (Kolla-Ansible's prechecks test for that socket before `nova_libvirt` exists). Tell it
+apart: `docker ps` shows `nova_libvirt` restarting, or the log line above; `docker logs nova_libvirt` and
+`/var/log/kolla/libvirt/libvirtd.log` say why.
 
 ### Cause 2: nova-compute cannot reach RabbitMQ
 
 The compute cannot open the RabbitMQ port of the controllers: a firewall, a wrong `network_interface` on this host,
-an MTU problem on the path. Tell it apart: the AMQP line repeats with `Trying again in N seconds`.
+an MTU problem on the path, or, with RabbitMQ TLS, a CA the compute does not trust. Tell it apart: the AMQP line
+repeats with `Trying again in N seconds`, or TLS handshake errors follow it.
 
 ### Cause 3: the service registered under another name
 
@@ -109,13 +122,9 @@ Nova registers a libvirt compute under its `[DEFAULT] host` option, which Kolla-
 host name of the machine), while Kolla-Ansible waits for `ansible_facts.nodename`. A `host =` set in a
 `/etc/kolla/config/nova.conf` or `nova/nova-compute.conf` override, or a host renamed after its facts were gathered
 (fact cache), makes the two differ. Tell it apart: `openstack compute service list` shows a service for this host
-under another name, `up`.
-
-### Cause 4: nova-compute cannot reach the API endpoints it needs
-
-It needs Keystone and Placement through the internal endpoint. A wrong `kolla_internal_fqdn` resolution on the
-compute, or a CA it does not trust with internal TLS, stops it. Tell it apart: placement or Keystone errors in the
-log.
+under another name, `up`. A host renamed after it registered once is a variant: Nova detects that the compute node
+it finds belongs to another host name and refuses to start (`_check_for_host_rename` in the compute manager), so no
+new service appears either; the log says so.
 
 ## Resolution
 
@@ -123,15 +132,19 @@ Fix the cause on the host, then run the same deploy again: it is idempotent, wai
 
 ### For cause 1
 
-Make hardware virtualisation available (`ls -l /dev/kvm` on the host), or, on a lab without it, set
-`nova_compute_virt_type: "qemu"` in `globals.yml` (much slower instances; labs only). Stop and disable any
-libvirt installed on the host itself.
+Read why `nova_libvirt` stops in its log and fix that. If the deployment uses the containerised libvirt (the default,
+`enable_nova_libvirt_container: true`) and a libvirt is also installed on the host, stop and disable the host one,
+including its socket-activation units (`libvirtd.socket`, `libvirtd-ro.socket`, `libvirtd-admin.socket`, or the
+modular `virtqemud*` units on newer distributions), otherwise the socket comes back. A host libvirt is a supported
+mode (`enable_nova_libvirt_container: false`); then leave it running and look at it instead.
 
 > ⚠️ **State-changing.** Stopping a host libvirt stops any virtual machine it runs; on a new compute there should be
-> none. Undo: `systemctl enable --now libvirtd`.
+> none. Undo: `systemctl enable --now` on the same units.
 
 ```bash
-sudo systemctl disable --now libvirtd
+systemctl list-units --all 'libvirtd*' 'virtqemud*'       # read-only: what exists on this host
+sudo systemctl disable --now libvirtd.service libvirtd.socket libvirtd-ro.socket libvirtd-admin.socket
+kolla-ansible prechecks -i <inventory> --limit compute-03   # from the deploy host: the socket check passes
 ```
 
 ### For cause 2
@@ -152,11 +165,6 @@ one exists.
 ```bash
 openstack compute service delete <service-id>
 ```
-
-### For cause 4
-
-Fix the name resolution of `kolla_internal_fqdn` on the compute, or the CA trust (`kolla_copy_ca_into_containers`,
-`openstack_cacert`), then deploy again.
 
 ### Then, for every cause
 
@@ -180,6 +188,8 @@ The deploy goes past *Waiting for nova-compute services to register themselves* 
 - Written from the Kolla-Ansible 2026.1 code (`ansible/roles/nova-cell/tasks/wait_discover_computes.yml`,
   `discover_computes.yml`, `templates/nova.conf.j2`, `defaults/main.yml`) and the Nova documentation. Not reproduced
   on a lab for this page. Status `draft`.
+- The statement that Placement or Keystone errors do not block registration comes from the order of `Service.start()`
+  in Nova 2026.1 (`init_host`, then the service record), as pointed out in this page's review; not run.
 - The log lines in the diagnosis table are the messages of Nova's libvirt driver and of oslo.messaging's RabbitMQ
   driver; their exact wording can differ between releases.
 - Not covered: Ironic compute services (they register under `<host>-ironic` or a custom name), the fake driver, and
