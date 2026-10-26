@@ -77,6 +77,9 @@ Kolla-Ansible "will NOT update an existing retention policy": changing the two v
 does nothing by itself. The guide's options: change the policy in Dashboards or through the API, or delete it and let
 Kolla-Ansible apply the new one.
 
+For more than the two ages, the guide lets advanced users override `opensearch_retention_policy` with a whole Index
+State Management policy; like the variables, it only takes effect if set before the policy is first created.
+
 ## Inventory and configuration layout
 
 ```text
@@ -157,20 +160,48 @@ sudo grep -h "<request-id-without-req>" /var/log/kolla/nova/*.log      # on each
 > ⚠️ **State-changing.** Creates the OpenSearch and Dashboards containers on the `opensearch` hosts, reconfigures and
 > restarts `fluentd` on every host, and adds HAProxy frontends. A new HAProxy frontend restarts the `haproxy`
 > containers on every load balancer host (backups first, then the VIP holder): a brief interruption of every API
-> behind the VIPs. Plan it in a window. Log files on the hosts are not affected. Undo: `enable_central_logging: "no"` and reconfigure; Kolla-Ansible does not remove the
-> OpenSearch containers or their data, so stop and remove them on each host.
+> behind the VIPs. Plan it in a window. Log files on the hosts are not affected. Undo: see *Undoing it* below;
+> setting `enable_central_logging: "no"` is not enough.
 
 ```bash
 kolla-ansible deploy -i <inventory> --tags common,fluentd,loadbalancer,opensearch
 ```
 
-In 2026.1 Fluentd has its own role and tag (`fluentd`); the `opensearch` role deploys both OpenSearch and its
+The `opensearch` role already configures its own HAProxy frontends under the `opensearch` tag; `loadbalancer` is in
+the list so that the HAProxy containers themselves are deployed and checked in the same run, which is harmless if
+they already run. In 2026.1 Fluentd has its own role and tag (`fluentd`); the `opensearch` role deploys both OpenSearch and its
 Dashboards. Verify (read-only):
 
 ```bash
 curl -s "http://<internal-vip>:9200/_cluster/health?pretty"     # status green, or yellow with one node
 curl -s "http://<internal-vip>:9200/_cat/indices/flog-*?v"      # today's index exists and grows
 sudo tail -20 /var/log/kolla/fluentd/fluentd.log                # on any host: no connection errors
+```
+
+### Undoing it
+
+`enable_central_logging: "no"` does not remove what was deployed:
+
+- `enable_opensearch` stays true when `enable_osprofiler` is set, or when CloudKitty stores its data in OpenSearch
+  (`ansible/group_vars/all/opensearch.yml`): OpenSearch is then still wanted, and only Fluentd's shipping stops.
+- The containers and the `opensearch` volume stay on the hosts.
+- The HAProxy fragments for OpenSearch and Dashboards stay under `/etc/kolla/haproxy/services.d/` on each load balancer
+  host: the `haproxy-config` role writes fragments for enabled services and never deletes one. The Dashboards
+  frontend stays on the external VIP, with dead back-ends.
+
+> ⚠️ **State-changing.** Removes the logging containers and their HAProxy frontends. The `reconfigure` restarts the
+> `haproxy` containers, with the same brief interruption of every API as above. Precondition: `enable_central_logging`
+> is already `"no"` and nothing else needs OpenSearch. Logs stored in OpenSearch stay in the `opensearch` volume until
+> you remove it, which deletes them.
+
+```bash
+kolla-ansible reconfigure -i <inventory> --tags fluentd      # Fluentd stops shipping to OpenSearch
+# on each opensearch host
+sudo docker rm -f opensearch opensearch_dashboards           # or: sudo podman rm -f ...
+# on each load balancer host: the fragments of OpenSearch and Dashboards
+ls /etc/kolla/haproxy/services.d/
+sudo rm /etc/kolla/haproxy/services.d/<opensearch-fragment>.cfg
+kolla-ansible reconfigure -i <inventory> --tags loadbalancer
 ```
 
 ## Where to look when it fails
@@ -190,7 +221,7 @@ sudo tail -20 /var/log/kolla/fluentd/fluentd.log                # on any host: n
 | Kolla-Ansible's OpenSearch | Fluentd outputs to an existing log platform (`config/fluentd/output/`) | Deployed and upgraded with the platform; request-ID searches out of the box | Disk, heap and retention to manage on the controllers |
 | OpenSearch on the controllers | Dedicated logging hosts in the `opensearch` group | No extra hosts | Logging load and disk on the hosts that run the control plane |
 | Dashboards on the internal VIP only | The 2026.1 default (external too) | Logs are sensitive | Reach Dashboards from the internal network or a VPN |
-| Retention set before the first deploy | Changed later | Kolla-Ansible applies the policy only once | Later changes go through Dashboards or the API |
+| Retention set before the first deploy, with the two variables or a whole `opensearch_retention_policy` | Changed later | Kolla-Ansible applies the policy only once | Later changes go through Dashboards or the API |
 
 ## What went wrong during deployment
 
@@ -219,6 +250,8 @@ CloudKitty, which also use OpenSearch, TLS between Fluentd and OpenSearch, and O
 
 ## Related
 
+- [Monitoring with Prometheus, Grafana and Alertmanager](monitoring-prometheus-grafana-and-alerting.md): the metrics
+  side, and the same HAProxy behaviour on deploy and undo.
 - [Laying out the configuration](../configuration/inventory-globals-overrides-and-secrets-layout.md)
 - Kolla-Ansible 2026.1: [central logging guide](https://docs.openstack.org/kolla-ansible/2026.1/reference/logging-and-monitoring/central-logging-guide.html)
 - OpenSearch: [Index Management plugin](https://opensearch.org/docs/latest/im-plugin/index/)
