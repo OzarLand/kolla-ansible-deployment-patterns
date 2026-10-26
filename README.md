@@ -90,6 +90,7 @@ wrong, version notes, lessons learned, validity and limits.
 | Service or integration | Releases | Status |
 |---|---|---|
 | [Octavia with the amphora provider. Certificates, the management network and the amphora image](services/octavia-amphora-certificates-and-management-network.md) | 2026.1 | draft |
+| [Central logging with Fluentd and OpenSearch in Kolla-Ansible. Where logs go, how to search them by request ID, and how long they are kept](services/central-logging-fluentd-and-opensearch.md) | 2026.1 | draft |
 
 | Comparison | Releases | Status |
 |---|---|---|
