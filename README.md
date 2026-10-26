@@ -73,6 +73,7 @@ wrong, version notes, lessons learned, validity and limits.
 | Operations | Releases | Status |
 |---|---|---|
 | [Adding a compute node to a running Kolla-Ansible deployment](operations/adding-a-compute-node.md) | 2026.1 | draft |
+| [Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup](operations/mariadb-backup-and-restore-with-mariabackup.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|

@@ -5,3 +5,4 @@ Day-2 procedures on a running Kolla-Ansible deployment: adding and removing host
 procedure, written with `templates/deployment-pattern.md`.
 
 - [Adding a compute node to a running deployment](adding-a-compute-node.md)
+- [Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup](mariadb-backup-and-restore-with-mariabackup.md)
