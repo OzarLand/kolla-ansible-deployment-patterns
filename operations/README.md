@@ -8,3 +8,4 @@ procedure, written with `templates/deployment-pattern.md`.
 - [deploy, reconfigure, upgrade and the others: which command to run, and --limit and --tags](deploy-reconfigure-upgrade-and-limiting-runs.md)
 - [Removing or replacing a compute node](removing-or-replacing-a-compute-node.md)
 - [Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup](mariadb-backup-and-restore-with-mariabackup.md)
+- [Checking a deployment after a change](checking-a-deployment-after-a-change.md)
