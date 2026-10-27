@@ -9,3 +9,4 @@ procedure, written with `templates/deployment-pattern.md`.
 - [Removing or replacing a compute node](removing-or-replacing-a-compute-node.md)
 - [Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup](mariadb-backup-and-restore-with-mariabackup.md)
 - [Checking a deployment after a change](checking-a-deployment-after-a-change.md)
+- [bootstrap-servers: what it changes on the hosts, and its pitfalls](bootstrap-servers-what-it-changes-and-its-pitfalls.md)
