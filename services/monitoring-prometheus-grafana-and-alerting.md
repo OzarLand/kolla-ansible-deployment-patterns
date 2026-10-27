@@ -210,21 +210,24 @@ files that exist in the configuration directory. HAProxy drops the frontends onl
 copies the directory afresh.
 
 > ⚠️ **State-changing.** Removes the monitoring containers, then restarts the `haproxy` container on every load
-> balancer host to drop the frontends: every API behind the VIPs is briefly interrupted on each restart, and if the
-> VIP holder restarts first, the VIP moves. Restart the backup hosts first, the VIP holder last, one at a time, in a
-> window. Precondition: the variables are already `"no"`, so that no later run writes the fragments again. The
-> Prometheus volume stays on disk until you remove it.
+> balancer host to drop the frontends: every API behind the VIPs is briefly interrupted on each restart, and the VIP
+> may move while the VIP holder restarts, since keepalived tracks the HAProxy process. Restart the backup hosts first,
+> the VIP holder last, one at a time, in a window. Precondition: the variables are already `"no"`, so that no later
+> run writes the fragments again. The Prometheus volume stays on disk until you remove it. Undo: set the variables to
+> `"yes"` again and run the deploy above, which recreates the containers and fragments.
 
 ```bash
 # on each host running them: the containers of the Topology table that exist there
 sudo docker rm -f prometheus_server prometheus_alertmanager grafana     # or: sudo podman rm -f ...
 # on each load balancer host
-sudo rm /etc/kolla/haproxy/services.d/prometheus-server.cfg \
-        /etc/kolla/haproxy/services.d/prometheus-alertmanager.cfg \
-        /etc/kolla/haproxy/services.d/grafana.cfg
-ip -br addr | grep -w "<internal-vip>"                        # prints a line only on the VIP holder
-sudo docker restart haproxy                                  # backups first, the VIP holder last
-sudo docker exec haproxy ls /etc/haproxy/services.d/         # the three fragments are gone inside the container
+sudo rm -f /etc/kolla/haproxy/services.d/prometheus-server.cfg \
+           /etc/kolla/haproxy/services.d/prometheus-alertmanager.cfg \
+           /etc/kolla/haproxy/services.d/grafana.cfg       # -f: Alertmanager's exists only where it was enabled
+# with haproxy_single_external_frontend only: delete the "# BEGIN grafana" ... "# END grafana" block, and the
+# prometheus-alertmanager one, from /etc/kolla/haproxy/external-frontend-map
+ip -br addr | grep -w "<internal-vip>"                        # a line only on the VIP holder; one keepalived holds both VIPs
+sudo docker restart haproxy                                  # or: sudo podman restart haproxy; backups first, VIP holder last
+sudo docker exec haproxy ls /etc/haproxy/services.d/         # or: sudo podman exec ...; the three fragments are gone
 ```
 
 RabbitMQ metrics need one more step: the `rabbitmq` role writes the plugin into RabbitMQ's configuration, so the
