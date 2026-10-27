@@ -12,14 +12,15 @@ environment:
   storage: any
   os: any supported by Kolla-Ansible 2026.1
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, all-in-one, ML2/OVS, no HAProxy", date: 2026-10-27, note: "safe sequence (prechecks, genconfig, validate-config, diff with -u root, reconfigure --tags) and an untagged reconfigure on Glance, one host; kolla_serial override and --limit fact gathering observed; deploy, deploy-containers, upgrade, stop, destroy, rolling runs, multi-host --limit and the HAProxy restart not run" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html
   - https://docs.openstack.org/kolla-ansible/2026.1/admin/advanced-configuration.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/adding-and-removing-hosts.html
   - https://bugs.launchpad.net/kolla-ansible/+bug/2054348
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # deploy, reconfigure, upgrade and the others
@@ -76,6 +77,12 @@ the newly generated files (`compare_container` in `ansible/module_utils/kolla_do
 differ are restarted. So a `reconfigure` after a change in one service's override restarts that service only, even
 without `--tags`. What `--tags` saves is time, and exposure to changes you did not mean to apply.
 
+The run's `changed` count does not count restarts. On a 2026.1 all-in-one lab, a full `reconfigure` after a change
+in Glance's override ended with `changed=22` (bootstrap containers of Keystone, Glance, Neutron, Heat and Placement,
+Keystone user registration, Fernet key distribution …) and restarted `glance_api` only. The restarts show as
+`Notify handlers to restart containers for <service>` among the changed tasks; `docker inspect -f
+'{{.Name}} {{.State.StartedAt}}'` before and after the run confirms them.
+
 ## Narrowing a run
 
 **`--tags <service>`** selects plays and tasks by tag. In `site.yml` each service's play is tagged with its name
@@ -92,9 +99,10 @@ compute nodes, removing hosts, batching `bootstrap-servers`), and test other use
 **`-e kolla_serial=<n or %>`** runs each play in batches of hosts (a rolling run); the bootstrap servers guide uses it
 with `bootstrap-servers`. Beware with `reconfigure` and `upgrade`: in the 2026.1 CLI these two commands add
 `-e kolla_serial=0` themselves, and they add it after the operator's own `-e` options (`kolla_ansible/ansible.py`
-appends the command's variables last; Ansible keeps the last value). Read from the code, a `-e kolla_serial=…` given
-to `reconfigure` or `upgrade` is therefore overridden and the run is not rolling. This was not tested; check the
-`ansible-playbook` command line (`-vvv`) on a lab before relying on a rolling `reconfigure`.
+appends the command's variables last; Ansible keeps the last value). A `-e kolla_serial=…` given to `reconfigure` or
+`upgrade` is therefore overridden and the run is not rolling. Seen on a lab: `kolla-ansible reconfigure … -e
+kolla_serial=1` ran `ansible-playbook` with `-e kolla_serial=1 -e kolla_action=reconfigure -e kolla_serial=0`, in
+that order.
 
 **Never** combine `--limit` with clustered services in a way that leaves the cluster without its other members in the
 play when membership changes (MariaDB, RabbitMQ): the upstream guide asks to include all controllers (`--limit
@@ -114,12 +122,19 @@ control`) when controllers are added or removed.
    kolla-ansible genconfig -i <inventory> --tags <service>
    kolla-ansible validate-config -i <inventory> --tags <service>
    # on a host, compare with what the container runs:
-   sudo docker exec <container> diff /etc/<service>/<file> /var/lib/kolla/config_files/<file>
+   sudo docker exec -u root <container> diff /etc/<service>/<file> /var/lib/kolla/config_files/<file>
    ```
 
    Inside the container, `/var/lib/kolla/config_files/` is the bind mount of `/etc/kolla/<container-config-dir>/` on
    the host (named after the container, for example `/etc/kolla/glance-api/` or `/etc/kolla/nova-compute/`), where
-   `genconfig` wrote the new files; `/etc/<service>/` holds the files the service runs with.
+   `genconfig` wrote the new files; `/etc/<service>/` holds the files the service runs with. That directory is
+   `drwxrwx--- root root`, and `docker exec` runs as the service user (`glance` for `glance_api`), hence `-u root`;
+   without it `diff` fails with `Permission denied`.
+
+   `validate-config` exits 0 even when it finds errors: read the reports under
+   `/var/log/kolla/config-validate/<host>/<service>/<container>/*.err`. On 2026.1 the Glance report holds two `ERROR`
+   lines for options Kolla-Ansible itself sets (`os_glance_tasks_store/filesystem_store_datadir is not part of the
+   sample config`, same for `os_glance_staging_store`); compare with a report taken before your change.
 
 4. Apply it:
 
@@ -143,7 +158,7 @@ control`) when controllers are added or removed.
 | `reconfigure --tags <service>` for one service | A full `reconfigure` | Shorter, and does not apply unrelated pending changes | Pending changes in other services stay unapplied until the next full run; know what is pending |
 | A full `reconfigure` from time to time | Tags only | Proves the whole configuration still applies | Long; restarts whatever drifted |
 | `genconfig` + `validate-config` before applying | Apply directly | See the files before any restart | One more step |
-| `kolla_serial` for rolling runs | All hosts at once | Keeps some containers up while others restart | Works with `deploy` and `bootstrap-servers`; with `reconfigure` and `upgrade` the CLI appears to override it (above) |
+| `kolla_serial` for rolling runs | All hosts at once | Keeps some containers up while others restart | Works with `deploy` and `bootstrap-servers`; with `reconfigure` and `upgrade` the CLI overrides it (above) |
 | `--limit` only where upstream documents it | `--limit` for everything | Known bugs (bug 2054348) | Some changes need a full-inventory run |
 
 ## What went wrong during deployment
@@ -170,8 +185,17 @@ roles read (Glance, MariaDB, Nova cell); check a role before relying on it for a
 ## Validity and limits
 
 - Written from the Kolla-Ansible 2026.1 operating guide, `kolla_ansible/cli/commands.py`, `ansible/site.yml`,
-  `ansible/gather-facts.yml`, some roles' `reconfigure.yml`, and `ansible/module_utils/kolla_docker_worker.py`. Not run
-  on a lab for this page. Status `draft`.
+  `ansible/gather-facts.yml`, some roles' `reconfigure.yml`, and `ansible/module_utils/kolla_docker_worker.py`.
+- Lab run, 2026-10-27, Kolla-Ansible 22.2.0 (2026.1) all-in-one, Docker, no HAProxy: the safe sequence ran end to end
+  on Glance (`debug = True` in `/etc/kolla/config/glance.conf`): `prechecks --tags glance` 15 s, `genconfig` 10 s
+  (no container restarted), `validate-config` 23 s, the in-container `diff` (with `-u root`) showed the change,
+  `reconfigure --tags glance` 76 s restarted `glance_api` only (healthy 11 s later). The undo (override removed,
+  full `reconfigure` without `--tags`) took 647 s and restarted `glance_api` only. `-e kolla_serial=1` overridden by
+  the CLI's `kolla_serial=0` (command line observed). `--limit localhost` with an unreachable host in the inventory
+  failed in `Gather facts for all hosts (if using --limit)` (`UNREACHABLE`, rc 4).
+- Not run on the lab: `deploy`, `deploy-containers`, `upgrade`, `pull`, `check`, `post-deploy`, `stop`, `destroy`;
+  a rolling run (`kolla_serial` with `deploy`); `--limit` across real hosts and bug 2054348; the HAProxy restart by
+  `--tags <service>` (HAProxy disabled on the lab); restarts on several hosts at once. Status `draft`.
 - `docker exec … diff` assumes the image has `diff`; most Kolla images do, not checked for each.
 - Not covered: Podman specifics, `migrate-container-engine`, Bifrost commands, `nova-libvirt-cleanup`,
   `rabbitmq-reset-state`.
