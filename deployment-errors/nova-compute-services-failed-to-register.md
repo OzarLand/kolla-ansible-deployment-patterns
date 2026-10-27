@@ -144,8 +144,12 @@ mode (`enable_nova_libvirt_container: false`); then leave it running and look at
 ```bash
 systemctl list-units --all 'libvirtd*' 'virtqemud*'       # read-only: what exists on this host
 sudo systemctl disable --now libvirtd.service libvirtd.socket libvirtd-ro.socket libvirtd-admin.socket
-kolla-ansible prechecks -i <inventory> --limit compute-03   # from the deploy host: the socket check passes
+kolla-ansible prechecks -i <inventory> --limit <compute>    # from the deploy host: the socket check passes
 ```
+
+The precheck tests the socket only while no `nova_libvirt` container exists on the host. If `nova_libvirt` already
+exists (for example restarting), it skips the test, and a passing precheck proves nothing about the socket: check
+`ls -l /run/libvirt/libvirt-sock` and the units above instead.
 
 ### For cause 2
 
@@ -171,7 +175,7 @@ openstack compute service delete <service-id>
 > ⚠️ **State-changing.** Deploys again to the failed host, (re)starts its compute containers and registers it.
 
 ```bash
-kolla-ansible deploy -i <inventory> --limit compute-03
+kolla-ansible deploy -i <inventory> --limit <compute>
 ```
 
 ## Verification

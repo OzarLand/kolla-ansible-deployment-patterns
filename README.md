@@ -72,6 +72,7 @@ wrong, version notes, lessons learned, validity and limits.
 | [kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client": Docker does not know the registry is plain HTTP](deployment-errors/pull-fails-http-response-to-https-client-insecure-registry.md) | 2026.1 | draft |
 | [kolla-ansible deploy times out at "Wait for haproxy to listen on VIP": the internal VIP never comes up, or cannot be reached](deployment-errors/deploy-times-out-waiting-for-haproxy-on-the-internal-vip.md) | 2026.1 | draft |
 | [kolla-ansible deploy fails with "The following Nova compute services failed to register themselves"](deployment-errors/nova-compute-services-failed-to-register.md) | 2026.1 | draft |
+| [kolla-ansible prechecks fails with "Ansible version should be between ...", or plays fail on missing modules: the wrong Ansible or collections on the deploy host](deployment-errors/ansible-version-not-supported-or-wrong-ansible-on-the-deploy-host.md) | 2026.1 | draft |
 | [RabbitMQ nodes do not form a cluster during kolla-ansible deploy: host name resolution, the Erlang cookie, closed ports or old cluster state](deployment-errors/rabbitmq-nodes-do-not-form-a-cluster.md) | 2026.1 | draft |
 
 | Operations | Releases | Status |
@@ -79,6 +80,7 @@ wrong, version notes, lessons learned, validity and limits.
 | [Adding a compute node to a running Kolla-Ansible deployment](operations/adding-a-compute-node.md) | 2026.1 | draft |
 | [deploy, reconfigure, upgrade and the others. Which kolla-ansible command to run after a change, and how to narrow it with --limit and --tags](operations/deploy-reconfigure-upgrade-and-limiting-runs.md) | 2026.1 | draft |
 | [Removing or replacing a compute node in a Kolla-Ansible deployment](operations/removing-or-replacing-a-compute-node.md) | 2026.1 | draft |
+| [Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup](operations/mariadb-backup-and-restore-with-mariabackup.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|
@@ -96,6 +98,7 @@ wrong, version notes, lessons learned, validity and limits.
 |---|---|---|
 | [Octavia with the amphora provider. Certificates, the management network and the amphora image](services/octavia-amphora-certificates-and-management-network.md) | 2026.1 | draft |
 | [Monitoring with Prometheus, Grafana and Alertmanager in Kolla-Ansible. What is deployed, and the rules, receivers and dashboards you still have to bring](services/monitoring-prometheus-grafana-and-alerting.md) | 2026.1 | draft |
+| [Central logging with Fluentd and OpenSearch in Kolla-Ansible. Where logs go, how to search them by request ID, and how long they are kept](services/central-logging-fluentd-and-opensearch.md) | 2026.1 | draft |
 
 | Comparison | Releases | Status |
 |---|---|---|
