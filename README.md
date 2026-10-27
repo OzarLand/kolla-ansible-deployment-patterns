@@ -81,6 +81,7 @@ wrong, version notes, lessons learned, validity and limits.
 | [Removing or replacing a compute node in a Kolla-Ansible deployment](operations/removing-or-replacing-a-compute-node.md) | 2026.1 | draft |
 | [Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup](operations/mariadb-backup-and-restore-with-mariabackup.md) | 2026.1 | draft |
 | [Checking a Kolla-Ansible deployment after a change. kolla-ansible check, cluster state, service lists and one real instance](operations/checking-a-deployment-after-a-change.md) | 2026.1 | draft |
+| [Replacing a failed controller in a three-controller Kolla-Ansible deployment](operations/replacing-a-failed-controller.md) | 2026.1 | draft |
 
 | Storage pattern | Releases | Status |
 |---|---|---|
