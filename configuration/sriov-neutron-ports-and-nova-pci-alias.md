@@ -94,14 +94,26 @@ neutron_sriov_physnet_mappings:
   sriovtenant1: <pf-interface>            # physical network name : PF interface on the computes
 ```
 
+These two options are lists, and an override **replaces** them. Kolla-Ansible's 2026.1 `ml2_conf.ini.j2` already
+writes `flat_networks = <neutron_physical_networks>` (`physnet1`, … one per bridge in `neutron_bridge_name`) and, with
+Ironic, `network_vlan_ranges` with the same names; a previous override of yours may have set them too. Read what is
+rendered today, then write lists that keep every existing physical network and add the SR-IOV one (read-only):
+
+```bash
+sudo grep -E "^(flat_networks|network_vlan_ranges)" /etc/kolla/neutron-server/ml2_conf.ini   # on a controller
+```
+
 ```ini
-# /etc/kolla/config/neutron/ml2_conf.ini
+# /etc/kolla/config/neutron/ml2_conf.ini (example: the rendered file had flat_networks = physnet1)
 [ml2_type_vlan]
-network_vlan_ranges = sriovtenant1:<first-vlan>:<last-vlan>
+network_vlan_ranges = physnet1,sriovtenant1:<first-vlan>:<last-vlan>
 
 [ml2_type_flat]
-flat_networks = sriovtenant1
+flat_networks = physnet1,sriovtenant1
 ```
+
+A physical network missing from the new lists can no longer be used for new flat or VLAN networks after the
+reconfigure; existing networks on it are not deleted, but nothing new can be created there.
 
 What `enable_neutron_sriov` does in 2026.1:
 
@@ -109,6 +121,8 @@ What `enable_neutron_sriov` does in 2026.1:
 - deploys `neutron_sriov_agent` on the computes, with `physical_device_mappings` from `neutron_sriov_physnet_mappings`;
 - writes **`[pci] passthrough_whitelist`** in the computes' `nova.conf`, built from the same mappings
   (`nova_pci_passthrough_whitelist` in the `nova-cell` role): one entry per PF interface with its physical network.
+  The entries match on the interface name (`devname`): if a PF has another name on some host, or is renamed, the entry
+  matches nothing there and ports fail to bind (see the `host_vars` row below).
 
 That last point matters if you also follow the guide's Nova PCI alias section, which writes `[pci] device_spec` in an
 override: `passthrough_whitelist` is the older name of `device_spec` in Nova. Two lists under two names for the same
@@ -129,14 +143,17 @@ enabled_filters = ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,
 The guide writes it in `/etc/kolla/config/nova.conf`; the scheduler-specific file above has the same effect for the
 scheduler and wins over `nova.conf` in Kolla-Ansible's merge order. If you already have a scheduler override, for
 example for `NUMATopologyFilter` ([CPU pinning, huge pages and NUMA](cpu-pinning-hugepages-and-numa-on-computes.md)),
-add the filter to that one line: there is only one `enabled_filters`.
+add the filter to that one line: there is only one `enabled_filters`. With Blazar enabled, Kolla-Ansible's own list
+also has `BlazarFilter`, which this override drops; the CPU pinning page says how to add it back.
 
 ## Applying it
 
-> ⚠️ **State-changing.** Reconfigures Neutron (ML2 drivers; `neutron-server` restarts), deploys the SR-IOV agent on
-> every compute, and changes `nova.conf` on the computes and the scheduler, whose containers restart. Running
-> instances keep running; API calls to Neutron and Nova may fail during the restarts. Undo: `enable_neutron_sriov:
-> "no"`, remove the overrides and reconfigure; the `neutron_sriov_agent` containers stay until removed by hand.
+> ⚠️ **State-changing.** Reconfigures Neutron (ML2 drivers and the physical network lists, which replace the rendered
+> ones: check that they still contain every existing physical network; `neutron-server` restarts), deploys the SR-IOV
+> agent on every compute, and changes `nova.conf` on the computes and the scheduler, whose containers restart.
+> Running instances keep running; API calls to Neutron and Nova may fail during the restarts. Undo:
+> `enable_neutron_sriov: "no"`, remove the overrides and reconfigure; the `neutron_sriov_agent` containers stay until
+> removed by hand.
 
 ```bash
 kolla-ansible reconfigure -i <inventory> --tags neutron,nova
@@ -150,7 +167,8 @@ sudo grep -A2 "^\[pci\]" /etc/kolla/nova-compute/nova.conf    # on a compute: th
 ```
 
 > ⚠️ **State-changing.** Creates a provider network, a port and an instance in a test project. Provider networks are
-> an administrator action.
+> an administrator action. Undo, in this order: `openstack server delete sriov-test-vm`, `openstack port delete
+> sriov-test-port`, `openstack network delete sriov-test`.
 
 ```bash
 openstack network create --provider-network-type vlan --provider-physical-network sriovtenant1 \
