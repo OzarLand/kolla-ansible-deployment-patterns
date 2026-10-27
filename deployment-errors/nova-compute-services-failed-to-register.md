@@ -11,14 +11,15 @@ environment:
   storage: any
   os: any host OS supported by the Kolla-Ansible release
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0 all-in-one, ML2/OVS", date: 2026-10-27, note: "cause 3 rename variant reproduced (host = override after deleting the service) and fixed by removing the override and deploying again (--tags nova, no --limit on an all-in-one); causes 1 and 2, the libvirt unit commands, prechecks, fact-cache clear and deletion of a wrongly named record not run" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/user/adding-and-removing-hosts.html
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/compute/nova-guide.html
   - https://docs.openstack.org/nova/2026.1/admin/cells.html
   - https://docs.openstack.org/nova/2026.1/admin/support-compute.html
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # kolla-ansible deploy fails with "The following Nova compute services failed to register themselves"
@@ -30,15 +31,21 @@ seconds, then fails on one or more compute hosts:
 
 ```text
 TASK [nova-cell : Waiting for nova-compute services to register themselves] ****
-FAILED - RETRYING: [compute-03 -> controller-1]: Waiting for nova-compute services to register themselves (20 retries left).
+FAILED - RETRYING: [localhost]: Waiting for nova-compute services to register themselves (20 retries left).
 ...
-TASK [nova-cell : Fail if nova-compute service failed to register] ****
-fatal: [compute-03]: FAILED! => {"changed": false, "msg": "The following Nova compute services failed to register themselves: compute-03"}
+FAILED - RETRYING: [localhost]: Waiting for nova-compute services to register themselves (1 retries left).
+[ERROR]: Task failed: Action failed.
+...
+TASK [nova-cell : Fail if nova-compute service failed to register] *************
+[ERROR]: Task failed: Action failed: The following Nova compute services failed to register themselves: compute-1
+...
+fatal: [localhost]: FAILED! => {"changed": false, "msg": "The following Nova compute services failed to register themselves: compute-1"}
 ```
 
-The task names and the message are those of `ansible/roles/nova-cell/tasks/wait_discover_computes.yml` in
-Kolla-Ansible 2026.1; the retry lines follow Ansible's usual format and are reconstructed, not copied from a run. The
-name after the colon is the host's node name (`ansible_facts.nodename`), which may be a full name.
+These lines were captured on an all-in-one lab (Kolla-Ansible 22.2.0, ansible-core 2.20), where the host is
+`localhost` in the inventory; on a multinode deployment the retry lines name the compute and the delegated
+conductor host (`[compute-03 -> controller-1]`). The name after the colon is the host's node name
+(`ansible_facts.nodename`), which may be a full name.
 
 ## Impact
 
@@ -91,7 +98,7 @@ which:
 |---|---|
 | `Connection to libvirt failed` | libvirt (cause 1) |
 | `AMQP server on <address>:5672 is unreachable` | RabbitMQ (cause 2) |
-| The service starts normally, and `openstack compute service list` shows the host under another name, or Nova stops at start-up on a detected host rename | a host name mismatch (cause 3) |
+| The service starts normally, and `openstack compute service list` shows the host under another name, or Nova stops at start-up on a detected host rename (`Possible rename detected, refusing to start!`) | a host name mismatch (cause 3) |
 
 Errors about the placement API or Keystone (connection refused, `401`, certificate errors) do **not** cause this
 failure: in Nova 2026.1 the compute service record is created after `init_host`, whose only Placement call logs
@@ -124,7 +131,16 @@ host name of the machine), while Kolla-Ansible waits for `ansible_facts.nodename
 (fact cache), makes the two differ. Tell it apart: `openstack compute service list` shows a service for this host
 under another name, `up`. A host renamed after it registered once is a variant: Nova detects that the compute node
 it finds belongs to another host name and refuses to start (`_check_for_host_rename` in the compute manager), so no
-new service appears either; the log says so.
+new service appears either; the log says so:
+
+```text
+ERROR nova.service nova.exception.InvalidConfiguration: My node <node-uuid> has host 'compute-1' but my host is 'aio-renamed'; Possible rename detected, refusing to start!
+```
+
+On the lab this happened even after the old compute service had been deleted (`openstack compute service delete`):
+the node UUID that `nova-compute` keeps in `/var/lib/nova/compute_id` still pointed to the old host name. Meanwhile
+`docker ps` showed `nova_compute` as `Up ... (healthy)`: the container is restarted after each exit, so quick check 3
+alone does not reveal it; read the log.
 
 ## Resolution
 
@@ -170,6 +186,10 @@ one exists.
 openstack compute service delete <service-id>
 ```
 
+Nova refuses it while the host has instances (`ConflictException: 409 ... Unable to delete compute service that is
+hosting instances. Migrate or delete the instances first.`); on the lab the refusal also came right after the last
+instance was deleted, and the same command passed about 20 seconds later.
+
 ### Then, for every cause
 
 > ⚠️ **State-changing.** Deploys again to the failed host, (re)starts its compute containers and registers it.
@@ -190,8 +210,13 @@ The deploy goes past *Waiting for nova-compute services to register themselves* 
 ## Validity and limits
 
 - Written from the Kolla-Ansible 2026.1 code (`ansible/roles/nova-cell/tasks/wait_discover_computes.yml`,
-  `discover_computes.yml`, `templates/nova.conf.j2`, `defaults/main.yml`) and the Nova documentation. Not reproduced
-  on a lab for this page. Status `draft`.
+  `discover_computes.yml`, `templates/nova.conf.j2`, `defaults/main.yml`) and the Nova documentation.
+- Lab run (Kolla-Ansible 22.2.0, all-in-one, ML2/OVS): the cause 3 rename variant only, injected with `host =` in
+  `/etc/kolla/config/nova/nova-compute.conf` after deleting the host's instance and compute service. The deploy
+  (`--tags nova`) failed after the 20 retries with the symptom above (9 min for the whole run); removing the override
+  and running the deploy again registered the host (`Discover nova hosts` ran, `failed=0`, 5 min). Causes 1 and 2,
+  the libvirt unit commands, `kolla-ansible prechecks`, a fact-cache clear and the deletion of a wrongly named
+  service record (none was created) were not run.
 - The statement that Placement or Keystone errors do not block registration comes from the order of `Service.start()`
   in Nova 2026.1 (`init_host`, then the service record), as pointed out in this page's review; not run.
 - The log lines in the diagnosis table are the messages of Nova's libvirt driver and of oslo.messaging's RabbitMQ

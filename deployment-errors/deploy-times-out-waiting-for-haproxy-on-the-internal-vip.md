@@ -11,14 +11,15 @@ environment:
   storage: any
   os: any host OS supported by the Kolla-Ansible release
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, 3 controllers (loadbalancer group, keepalived unicast, ProxySQL) + 2 computes, nested in an OpenStack cloud", date: 2026-10-27, note: "cause 4 reproduced: VIP removed from the allowed address pairs of the controller ports, reconfigure --tags loadbalancer with a changed keepalived_virtual_router_id timed out on the two hosts not holding the VIP; quick checks, cause 4 resolution (port set) and verification run, reconfigure then passed. The cause 4 undo needed mac-address. Not run: causes 1-3 and their resolutions, the nonlocal_bind and wrong-subnet variants, tcpdump, multicast mode" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/high-availability/haproxy-guide.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/multinode.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/multi-regions.html
   - https://keepalived.readthedocs.io/en/latest/configuration_synopsis.html
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # kolla-ansible deploy times out at "Wait for haproxy to listen on VIP"
@@ -29,14 +30,24 @@ last_verified: 2026-10-26
 HAProxy containers were (re)started, with:
 
 ```text
-RUNNING HANDLER [loadbalancer : Wait for haproxy to listen on VIP] *****
-fatal: [controller-1]: FAILED! => {"changed": false, "elapsed": 300, "msg": "Timeout when waiting for 192.0.2.10:61313"}
+RUNNING HANDLER [loadbalancer : Wait for haproxy to listen on VIP] *************
+ok: [controller-3]
+[ERROR]: Task failed: Module failed: Timeout when waiting for 192.0.2.10:61313
+Origin: ~/kolla-venv/share/kolla-ansible/ansible/roles/loadbalancer/handlers/main.yml:309:3
+...
+fatal: [controller-2]: FAILED! => {"changed": false, "elapsed": 301, "msg": "Timeout when waiting for 192.0.2.10:61313"}
+fatal: [controller-1]: FAILED! => {"changed": false, "elapsed": 301, "msg": "Timeout when waiting for 192.0.2.10:61313"}
 ```
 
-The lines above are reconstructed from the handler and Ansible's `wait_for` module, not copied from a run.
-`192.0.2.10` stands for `kolla_internal_vip_address`; `61313` is `haproxy_monitor_port`. The handler waits for a TCP
-connection to that address and port, from each host of the `loadbalancer` group, for 300 seconds. The failure can
-come on every host or only on some of them.
+Captured on a lab (cause 4, below; Kolla-Ansible 22.2.0). `192.0.2.10` stands for `kolla_internal_vip_address`;
+`61313` is `haproxy_monitor_port`. The handler waits for a TCP connection to that address and port, from each host of
+the `loadbalancer` group, for 300 seconds. The failure can come on every host or only on some of them: on the lab,
+the host holding the VIP (`controller-3`) passed and the two others failed; the run went on with the other plays and
+ended with `failed=1` on those two hosts and `exited 2`.
+
+The handler runs only when keepalived is restarted (it is notified by the *Start backup/master keepalived container*
+handlers): on the lab, a change to HAProxy's configuration alone restarted HAProxy and ProxySQL, but not keepalived,
+and the run did not wait on the VIP.
 
 ## Impact
 
@@ -64,6 +75,9 @@ sudo docker logs --tail 50 keepalived
 # 4. Does HAProxy listen on the monitor port?
 sudo ss -ltnp | grep ':61313'
 ```
+
+Check 4 lists the VIP on every host where HAProxy runs, holder or not (HAProxy binds it with `ip_nonlocal_bind`): it
+says whether HAProxy listens, not who holds the VIP.
 
 From a host that does not hold the VIP:
 
@@ -144,6 +158,15 @@ The VIP is up on one host and HAProxy listens, but packets to the VIP do not arr
   runs.
 
 Tell it apart: from another host, ARP for the VIP gets no answer, or gets one but the TCP connection never completes.
+On a lab with the VIP removed from the allowed address pairs, the hosts that did not hold the VIP showed:
+
+```text
+2 packets transmitted, 0 received, +2 errors, 100% packet loss, time 1042ms      # ping -c 2 <internal-vip>
+000                                                                                # curl … http://<internal-vip>:61313/
+192.0.2.10 dev ens3 FAILED                                                         # ip neigh show <internal-vip>
+```
+
+while the holder answered `200` and keepalived logged a normal `Entering MASTER STATE` on one host only.
 
 ## Resolution
 
@@ -203,10 +226,12 @@ kolla-ansible reconfigure -i <inventory> --tags loadbalancer
 ### For cause 4
 
 - **Hosting cloud:** add the VIP (internal, and external if separate) to the allowed address pairs of every load
-  balancer host's port, on the hosting cloud, by whoever administers those ports:
+  balancer host's port, on the hosting cloud, by whoever administers those ports. On the lab, the VIP answered from
+  every host within seconds of the change, without restarting anything; the next `reconfigure` passed the wait:
 
   > ⚠️ **State-changing.** Changes the hosting cloud's port; it does not touch the Kolla-Ansible deployment. Undo:
-  > `openstack port unset --allowed-address ip-address=<internal-vip> <port-id>`.
+  > `openstack port unset --allowed-address ip-address=<internal-vip>,mac-address=<port-mac> <port-id>` (`port set`
+  > stores the port's MAC with the address; without it, `unset` answers `Port does not contain allowed-address-pair`).
 
   ```bash
   openstack port set --allowed-address ip-address=<internal-vip> <port-id>
@@ -235,7 +260,10 @@ Then the deploy goes past `Wait for haproxy to listen on VIP` and ends with `fai
 
 - Written from the Kolla-Ansible 2026.1 code (`ansible/roles/loadbalancer/handlers/main.yml`, `tasks/precheck.yml`,
   `templates/keepalived/keepalived.conf.j2`, `defaults/main.yml`) and its HAProxy, multinode and multi-region guides.
-  Not reproduced on a lab for this page. Status `draft`.
+  Cause 4 (allowed address pairs missing on a hosting cloud) was reproduced on a lab: Kolla-Ansible 22.2.0, 3
+  controllers in the `loadbalancer` group with `keepalived_traffic_mode: "unicast"`, ProxySQL, nested in an OpenStack
+  cloud; the failure was triggered by a `reconfigure --tags loadbalancer` that changed `keepalived_virtual_router_id`.
+  Causes 1 to 3, the subnet variant of cause 4 and the multicast mode were not reproduced. Status `draft`.
 - The causes are those the code and the guides make predictable; no incident was recorded for this page. The exact
   wording of keepalived's log lines depends on its version and is not quoted here on purpose.
 - `--tags loadbalancer` follows the play tags of `ansible/site.yml` in 2026.1; check them in your release.
