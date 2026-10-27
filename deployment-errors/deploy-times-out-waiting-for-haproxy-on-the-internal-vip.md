@@ -139,8 +139,9 @@ The VIP is up on one host and HAProxy listens, but packets to the VIP do not arr
   port's own: the VIP must be in the *allowed address pairs* of every load balancer host's port;
 - `kolla_internal_vip_address` is not in the subnet of `api_interface` (keepalived adds it to that interface, but
   nothing routes it there). On a first deployment, `kolla-ansible prechecks` catches this: its check *Checking if
-  kolla_internal_vip_address is in the same network as api_interface on all nodes* runs as long as no keepalived
-  container exists yet. On a running platform it no longer runs.
+  kolla_internal_vip_address is in the same network as api_interface on all nodes* runs on the hosts of the
+  `loadbalancer` group, as long as no keepalived container exists on them yet. On a running platform it no longer
+  runs.
 
 Tell it apart: from another host, ARP for the VIP gets no answer, or gets one but the TCP connection never completes.
 
