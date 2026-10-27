@@ -24,7 +24,8 @@ last_verified: 2026-10-26
 
 ## Symptom
 
-`kolla-ansible prechecks` stops early with:
+`kolla-ansible prechecks` stops at *Checking Ansible version*, after the role's earlier checks (inventory, host OS,
+time, ports, services), with:
 
 ```text
 TASK [prechecks : Checking Ansible version] ****
@@ -63,7 +64,7 @@ ansible-playbook --version | head -1
 /path/to/venv/bin/pip show kolla-ansible ansible-core | grep -E '^(Name|Version)'
 
 # 3. Which collections Ansible sees, and from where
-ansible-galaxy collection list 2>/dev/null | grep -E '^#|community.docker|ansible.utils|community.general'
+ansible-galaxy collection list 2>/dev/null | grep -E '^#|openstack.kolla|community.docker|ansible.utils|community.general'
 ```
 
 The problem is confirmed when `ansible-playbook` is not the one of the virtual environment, or its version is outside
@@ -103,7 +104,9 @@ it apart: `pip show ansible-core` in the environment gives a version outside 2.1
 
 `install-deps` was not run after installing or upgrading Kolla-Ansible, or another release's `install-deps` ran
 later for the same user. Tell it apart: the versions in `ansible-galaxy collection list` do not satisfy the bounds in
-`/path/to/venv/share/kolla-ansible/requirements.yml` and `requirements-core.yml`.
+`/path/to/venv/share/kolla-ansible/requirements-core.yml`, or the `openstack.kolla` collection is missing or comes
+from another release. That collection is installed from Git (`requirements.yml` names `ansible-collection-kolla` at
+`stable/2026.1` for 2026.1): its branch, not a version range, must match the release.
 
 ## Resolution
 
@@ -117,7 +120,9 @@ source /path/to/venv/bin/activate
 
 ### For cause 2
 
-Install the range the release requires into the environment, as the operating guide does for skip-level upgrades:
+Install the range the release requires into the environment. The range below is the one of the release's
+`requirements.txt`; the operating guide writes a looser `<2.20.99` bound in its step for skip-level (SLURP)
+upgrades only:
 
 > ⚠️ **State-changing.** Changes the Python packages of the deploy host's virtual environment only; nothing on the
 > OpenStack hosts. Undo: install the previous version back with the same command. Do it outside a running
