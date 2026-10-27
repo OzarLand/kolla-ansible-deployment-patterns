@@ -72,6 +72,7 @@ wrong, version notes, lessons learned, validity and limits.
 | [kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client": Docker does not know the registry is plain HTTP](deployment-errors/pull-fails-http-response-to-https-client-insecure-registry.md) | 2026.1 | draft |
 | [kolla-ansible deploy times out at "Wait for haproxy to listen on VIP": the internal VIP never comes up, or cannot be reached](deployment-errors/deploy-times-out-waiting-for-haproxy-on-the-internal-vip.md) | 2026.1 | draft |
 | [kolla-ansible deploy fails with "The following Nova compute services failed to register themselves"](deployment-errors/nova-compute-services-failed-to-register.md) | 2026.1 | draft |
+| [kolla-ansible deploy fails in the keystone role: Fernet bootstrap refused under --limit, key distribution over SSH failing, or keystone waiting for key 0](deployment-errors/keystone-fernet-bootstrap-or-key-distribution-fails.md) | 2026.1 | draft |
 
 | Operations | Releases | Status |
 |---|---|---|

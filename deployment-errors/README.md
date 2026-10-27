@@ -8,3 +8,4 @@ repository README for what belongs here. Add pages with `templates/deployment-pa
 - [pull fails with "http: server gave HTTP response to HTTPS client"](pull-fails-http-response-to-https-client-insecure-registry.md)
 - [deploy times out at "Wait for haproxy to listen on VIP"](deploy-times-out-waiting-for-haproxy-on-the-internal-vip.md)
 - [deploy fails with "The following Nova compute services failed to register themselves"](nova-compute-services-failed-to-register.md)
+- [deploy fails in the keystone role: Fernet bootstrap, key distribution, or key 0 missing](keystone-fernet-bootstrap-or-key-distribution-fails.md)
