@@ -11,3 +11,4 @@ repository README for what belongs here. Add pages with `templates/deployment-pa
 - [prechecks fails with "Ansible version should be between ...": the wrong Ansible or collections on the deploy host](ansible-version-not-supported-or-wrong-ansible-on-the-deploy-host.md)
 - [RabbitMQ nodes do not form a cluster during deploy](rabbitmq-nodes-do-not-form-a-cluster.md)
 - [deploy fails in the keystone role: Fernet bootstrap, key distribution, or key 0 missing](keystone-fernet-bootstrap-or-key-distribution-fails.md)
+- [fails with "MariaDB cluster exists but is stopped": recovering with mariadb-recovery](mariadb-cluster-exists-but-is-stopped-run-mariadb-recovery.md)
