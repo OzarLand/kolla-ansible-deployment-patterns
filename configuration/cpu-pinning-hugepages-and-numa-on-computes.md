@@ -203,7 +203,8 @@ sudo grep -i "dedicated\|shared\|error" /var/log/kolla/nova/nova-compute.log | t
 ```
 
 On a 4-CPU lab compute with `cpu_dedicated_set = 2-3`, `cpu_shared_set = 1` and `reserved_host_memory_mb = 1024`,
-the inventory went from `VCPU 4` to (resource class, allocation ratio, reserved, total):
+the inventory went from `VCPU 4` to (resource class, allocation ratio, reserved, total; from the run's
+reconfigure-and-placement capture):
 
 ```text
 VCPU 4.0 0 1
@@ -222,8 +223,8 @@ sudo docker exec nova_libvirt virsh vcpupin <domain>           # each vCPU on on
 sudo docker exec nova_libvirt virsh dumpxml <domain> | grep -A3 -E "hugepages|numatune"
 ```
 
-On the lab, the `hw:cpu_policy=dedicated` instance had its vCPU, emulator and I/O thread on host CPU 2 (from
-`cpu_dedicated_set`); the `hw:mem_page_size=large` and `hw:numa_nodes=1` instances were pinned to CPU 1, the
+On the lab, the `hw:cpu_policy=dedicated` instance had its vCPU and emulator thread on host CPU 2 (from
+`cpu_dedicated_set`; `vcpupin` and `emulatorpin` in the run's `virsh` capture); the `hw:mem_page_size=large` and `hw:numa_nodes=1` instances were pinned to CPU 1, the
 `cpu_shared_set`, and all three had `<numatune>` with `mode='strict'`; the huge-page one also had:
 
 ```text
@@ -231,9 +232,6 @@ On the lab, the `hw:cpu_policy=dedicated` instance had its vCPU, emulator and I/
       <page size='2048' unit='KiB' nodeset='0'/>
     </hugepages>
 ```
-
-`HugePages_Free` drops as the guest touches its memory: 83 of the 128 pages of a 256 MB instance were in use a minute
-after it booted.
 
 ## Where to look when it fails
 
@@ -257,7 +255,7 @@ after it booted.
 ## What went wrong during deployment
 
 On an all-in-one lab: instances created right after the `reconfigure` failed with `MessagingTimeout` while the
-scheduler's workers restarted (see *Applying it*); created again 3 minutes later, they booted.
+scheduler's workers restarted (see *Applying it*); created again about 4 minutes later, they booted.
 
 ## Version notes
 
