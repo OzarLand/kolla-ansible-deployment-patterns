@@ -70,7 +70,8 @@ with `openstack_tag` defaulting to `<openstack_release>-<kolla_base_distro>-<kol
 # globals.yml
 docker_registry: "registry.example.org:4000"
 docker_namespace: "openstack.kolla"      # the default; keep it if you mirror with the same paths
-docker_registry_ca: "/etc/kolla/certificates/registry-ca.crt"   # copied to /etc/docker/certs.d/<registry>/ca.crt
+docker_registry_ca: "/etc/kolla/certificates/registry-ca.crt"   # a path on the deploy host; copied to
+                                                                 # /etc/docker/certs.d/<registry>/ca.crt on the targets
 # docker_registry_username: "<user>"     # if the registry needs a login; the password is docker_registry_password
 ```
 
@@ -133,6 +134,7 @@ For TLS, Distribution takes a certificate and key through its own configuration 
 **1. Read-only checks** from a target host, once the registry is filled:
 
 ```bash
+# with TLS; for the guide's plain-HTTP example use http:// and see the deployment error page linked below
 curl -s --cacert <registry-ca.crt> https://registry.example.org:4000/v2/_catalog | head   # the openstack.kolla/* repositories
 curl -s --cacert <registry-ca.crt> https://registry.example.org:4000/v2/openstack.kolla/<image>/tags/list
 ```
@@ -140,8 +142,11 @@ curl -s --cacert <registry-ca.crt> https://registry.example.org:4000/v2/openstac
 **2. Apply the Docker settings** on the hosts:
 
 > ⚠️ **State-changing.** Writes `/etc/docker/daemon.json` and the registry CA on every host, and restarts Docker where
-> the configuration changed, which restarts every container on that host. On a running platform, limit it to new
-> hosts or plan a window per host. Undo: restore the previous variables and run it again.
+> the configuration changed, which restarts every container on that host unless Docker's `live-restore` is enabled
+> (see *Subsequent bootstrap considerations* in the
+> [bootstrap servers guide](https://docs.openstack.org/kolla-ansible/2026.1/reference/deployment-and-bootstrapping/bootstrap-servers.html)).
+> On a running platform, limit it to new hosts or plan a window per host. Undo: restore the previous variables and run
+> it again.
 
 ```bash
 kolla-ansible bootstrap-servers -i <inventory> --limit <new-or-maintenance-hosts>
@@ -163,6 +168,7 @@ kolla-ansible pull -i <inventory>
 | `manifest unknown` or `not found` for one image | that image or tag is missing from the registry: compare with `/v2/<namespace>/<image>/tags/list` |
 | Hosts still reach `quay.io` | `docker_registry` not set in the `globals.yml` used, or images referenced by a variable overriding `docker_image_url` |
 | `bootstrap-servers` fails installing Docker | the package mirror URL (`docker_apt_url`, `docker_yum_url`) or the OS repositories; the Ansible output and `/var/log/apt/` or `/var/log/dnf.log` on the host |
+| `pull` fails with an authentication error (`unauthorized`, `no basic auth credentials`) | the registry needs a login: set `docker_registry_username` in `globals.yml` and `docker_registry_password` in `passwords.yml` before `pull` |
 | Docker does not restart | `journalctl -u docker` on the host: a malformed `daemon.json` |
 
 ## Key choices and their consequences
