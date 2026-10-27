@@ -196,8 +196,12 @@ lab for this page.
 
 ```bash
 # on each other MariaDB node, never on the restored one
+sudo docker ps -a --filter name=mariadb --format '{{.Names}}\t{{.Status}}'   # read-only: mariadb must show Exited
 sudo find /var/lib/docker/volumes/mariadb/_data -mindepth 1 -delete
 ```
+
+Run the `find` only if the read-only check shows the `mariadb` container `Exited` on that host: emptying the data
+directory of a running node corrupts it.
 
 A lighter variant, **unverified**: moving only `grastate.dat` aside. When it is missing, MariaDB's start-up recovers
 the position from InnoDB (`--wsrep-recover`), with the same cluster UUID and the node's own newer `seqno`, so the
