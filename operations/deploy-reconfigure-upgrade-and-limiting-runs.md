@@ -58,7 +58,7 @@ From `kolla_ansible/cli/commands.py` and the operating guide, 2026.1:
 | Command | `kolla_action` | What it does to running containers | Risk |
 |---|---|---|---|
 | `prechecks` | `precheck` | Nothing; checks ports, files, variables before a deploy | read-only |
-| `genconfig` | `config` | Writes the configuration files under `/etc/kolla/<service>/` on the hosts; no container restarts, so not applied yet | state-changing (files) |
+| `genconfig` | `config` | Writes the configuration files under `/etc/kolla/<container-config-dir>/` on the hosts; no container restarts, so not applied yet | state-changing (files) |
 | `validate-config` | `config_validate` | Validates the generated configuration files; reports under `/var/log/kolla/config-validate` | read-only |
 | `check` | `check` | Checks container status | read-only |
 | `pull` | `pull` | Downloads images; no container changes | read-only for services |
@@ -86,8 +86,8 @@ always runs.
 **`--limit <hosts>`** restricts the hosts. Kolla-Ansible still gathers facts for every host (the `gather-facts` play
 delegates it to the limited hosts), so an unreachable host still fails the run. The operating guide warns: "using
 the ansible `--limit` option is not recommended", because of known bugs with how `register:` interacts with it (bug
-2054348; upgrading parts of Nova is the guide's example). Use it where the upstream documentation does (adding compute nodes, removing
-hosts, batching `bootstrap-servers`), and test other uses on a lab.
+2054348; upgrading parts of Nova is the guide's example). Use it where the upstream documentation does (adding
+compute nodes, removing hosts, batching `bootstrap-servers`), and test other uses on a lab.
 
 **`-e kolla_serial=<n or %>`** runs each play in batches of hosts (a rolling run); the bootstrap servers guide uses it
 with `bootstrap-servers`. Beware with `reconfigure` and `upgrade`: in the 2026.1 CLI these two commands add
@@ -106,9 +106,9 @@ control`) when controllers are added or removed.
 2. Read-only: `kolla-ansible prechecks -i <inventory>` (or with `--tags <service>`).
 3. Generate and look at the result without applying it:
 
-   > ⚠️ **State-changing.** Rewrites the configuration files under `/etc/kolla/<service>/` on the hosts. Running
-   > containers keep their current configuration until they restart; a container restarted for another reason (a
-   > host reboot, a crash) picks up the new files. Undo: revert the change and run `genconfig` again.
+   > ⚠️ **State-changing.** Rewrites the configuration files under `/etc/kolla/<container-config-dir>/` on the hosts.
+   > Running containers keep their current configuration until they restart; a container restarted for another reason
+   > (a host reboot, a crash) picks up the new files. Undo: revert the change and run `genconfig` again.
 
    ```bash
    kolla-ansible genconfig -i <inventory> --tags <service>
@@ -117,14 +117,15 @@ control`) when controllers are added or removed.
    sudo docker exec <container> diff /etc/<service>/<file> /var/lib/kolla/config_files/<file>
    ```
 
-   Inside the container, `/var/lib/kolla/config_files/` is the bind mount of `/etc/kolla/<service>/` on the host, where
+   Inside the container, `/var/lib/kolla/config_files/` is the bind mount of `/etc/kolla/<container-config-dir>/` on
+   the host (named after the container, for example `/etc/kolla/glance-api/` or `/etc/kolla/nova-compute/`), where
    `genconfig` wrote the new files; `/etc/<service>/` holds the files the service runs with.
 
 4. Apply it:
 
    > ⚠️ **State-changing.** Restarts the containers of that service whose configuration changed, on every host where
-   > it runs, all at once (see the `kolla_serial` remark above). API calls to that service fail briefly; for agents of the data
-   > plane (Neutron agents, `nova_compute`, `openvswitch`), say what a restart interrupts before running it. If the
+   > it runs, all at once (see the `kolla_serial` remark above). API calls to that service fail briefly; for agents of
+   > the data plane (Neutron agents, `nova_compute`, `openvswitch`), say what a restart interrupts before running it. If the
    > change touches the service's HAProxy frontends (TLS, ports, external endpoints), `--tags <service>` also restarts
    > the `haproxy` containers, backups first, then the host holding the VIP: every API behind the VIPs is briefly
    > interrupted. Undo: revert the change and run the same command.
