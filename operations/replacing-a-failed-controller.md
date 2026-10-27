@@ -164,9 +164,12 @@ keystone Fernet runbook in `deployment-errors/`).
 
 **7. Grow RabbitMQ's quorum queues and streams onto the replacement.**
 
-> ⚠️ **State-changing.** Adds a replica on the replacement to every quorum queue and replicates their contents: a
-> load on the RabbitMQ nodes and the network for a while. Precondition: `cluster_status` shows the three nodes
-> running. Undo: `rabbitmq-queues shrink rabbit@<replacement-short-name>`. Not observed on a lab for this page.
+> ⚠️ **State-changing.** Adds a replica on the replacement to every quorum queue and every stream, and replicates
+> their contents: a load on the RabbitMQ nodes and the network for a while. Precondition: `cluster_status` shows the
+> three nodes running. Undo: `rabbitmq-queues shrink rabbit@<replacement-short-name>` for the quorum queues, and
+> `rabbitmq-streams delete_replica <stream-queue> rabbit@<replacement-short-name>` for each stream. Not observed on a
+> lab for this page. The commands assume Kolla-Ansible's default vhost `/` (`om_rpc_vhost`, `om_notify_vhost`); if it
+> was changed, add `-p <vhost>` to `list_queues` and `--vhost <vhost>` to `add_replica`.
 
 ```bash
 # on one controller
@@ -196,8 +199,10 @@ done
 Galera size 3, RabbitMQ with three running nodes, every agent alive, a test instance. For the queues, on each node:
 
 ```bash
-sudo docker exec rabbitmq rabbitmq-queues check_if_node_is_quorum_critical   # fails if stopping this node would leave a queue without a majority
-sudo docker exec rabbitmq rabbitmqctl list_queues name type members           # quorum queues list all three nodes
+# fails if stopping this node would leave a queue without a majority
+sudo docker exec rabbitmq rabbitmq-queues check_if_node_is_quorum_critical
+# quorum queues list all three nodes
+sudo docker exec rabbitmq rabbitmqctl list_queues name type members
 ```
 
 Then rebalance routers and DHCP

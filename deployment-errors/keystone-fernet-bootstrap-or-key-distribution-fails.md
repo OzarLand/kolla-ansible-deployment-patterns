@@ -139,6 +139,7 @@ container is stopped, so look at the volume):
 
 ```bash
 sudo ls -l /var/lib/docker/volumes/keystone_fernet_tokens/_data/    # expected: files 0, 1, ... owned by the keystone user
+# with Podman: /var/lib/containers/storage/volumes/keystone_fernet_tokens/_data/
 ```
 
 > ⚠️ **State-changing.** Starts the stopped `keystone_fernet` container of a host; nothing else. Start it **only on
@@ -186,7 +187,9 @@ Make sure the push will come from a host that has the keys, then let the role re
 2. Check that at least one other Keystone host has a running `keystone_fernet` and a full key directory (the
    `sha256sum` command of the quick checks).
 3. Run the keystone role on every host: `kolla-ansible deploy -i <inventory> --tags keystone` (the same ⚠️ as
-   above). The push now comes from the first host, in inventory order, whose `keystone_fernet` was running.
+   above). The push now comes from the first host, in inventory order, whose `keystone_fernet` was running (the host
+   stopped in step 1 is not among them, even though the deploy starts it again: the role chooses the source before it
+   restarts containers).
 4. Compare the key hashes on every host (*Verification*).
 
 Do not copy keys by hand between hosts, and never run `fernet_setup` yourself on one host of a running cluster: that
