@@ -94,7 +94,7 @@ openstack compute service list               # every service up; disabled ones a
 openstack network agent list                 # every agent alive (ML2/OVS), or every OVN controller up (ML2/OVN)
 openstack volume service list                # if Cinder is deployed
 openstack resource provider list             # one per hypervisor (osc-placement plugin)
-sudo docker exec nova_api nova-status upgrade check   # on a controller; 0 = all checks passed, 1 = warnings
+sudo docker exec nova_api nova-status upgrade check   # on a controller; 0 = passed, 1 = warnings, 2 or more = a failure to fix
 ```
 
 **5. The logs since the change,** on each host, for errors the checks above do not show:
@@ -113,12 +113,24 @@ Read the files it lists; an `ERROR` right after a restart (a reconnection) can b
 ```bash
 openstack server create --flavor <small-flavor> --image <image> --network <network> --wait check-after-change
 openstack server show check-after-change -c status -c addresses -c OS-EXT-SRV-ATTR:host
-openstack console log show check-after-change | tail -20     # cloud-init reached the metadata service
+openstack console log show check-after-change | tail -20     # see below
+
+# only if you test external access
+openstack floating ip create <external-network>                     # note the address it returns
+openstack server add floating ip check-after-change <floating-ip>
+#   ... test access to <floating-ip> ...
+openstack floating ip delete <floating-ip>
+
 openstack server delete --wait check-after-change
 ```
 
+In the console log, an image with cloud-init shows its final `finished` line after reading the metadata; a CirrOS
+image prints its own metadata lines instead. Images without a serial console log show nothing useful here.
+
 When the change touched a single host or service, target it: a host with the administrator syntax
-`--availability-zone nova:<host>`, a volume back-end with a boot-from-volume instance, the external network with a
+`--availability-zone nova:<host>` (which bypasses the scheduler filters), or with compute API 2.74 and later
+`openstack --os-compute-api-version 2.74 server create --host <host> …`, which keeps the filters and refuses a host
+that does not fit, a volume back-end with a boot-from-volume instance, the external network with a
 floating IP.
 
 ## Key choices and their consequences
@@ -126,7 +138,7 @@ floating IP.
 | Choice | Alternative(s) | Why this one here | Consequence in operation |
 |---|---|---|---|
 | Cheapest checks first | Only a test instance | Finds the broken layer before the slow test | Six steps instead of one |
-| `kolla-ansible check` | Only `docker ps` | Knows which containers *should* run on each host | Fails on the first role with a problem; read the whole output |
+| `kolla-ansible check` | Only `docker ps` | Knows which containers *should* run on each host | A failed host is dropped from the rest of the run; read the recap, fix and run again |
 | A real instance | Trust the service lists | Agents can be listed alive while the data path is broken | A few minutes and a little quota |
 | Same checks before and after | After only | A difference is only visible against a baseline | Run them once before the change too |
 

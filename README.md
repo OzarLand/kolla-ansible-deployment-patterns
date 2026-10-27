@@ -74,6 +74,8 @@ wrong, version notes, lessons learned, validity and limits.
 | [kolla-ansible deploy fails with "The following Nova compute services failed to register themselves"](deployment-errors/nova-compute-services-failed-to-register.md) | 2026.1 | draft |
 | [kolla-ansible prechecks fails with "Ansible version should be between ...", or plays fail on missing modules: the wrong Ansible or collections on the deploy host](deployment-errors/ansible-version-not-supported-or-wrong-ansible-on-the-deploy-host.md) | 2026.1 | draft |
 | [RabbitMQ nodes do not form a cluster during kolla-ansible deploy: host name resolution, the Erlang cookie, closed ports or old cluster state](deployment-errors/rabbitmq-nodes-do-not-form-a-cluster.md) | 2026.1 | draft |
+| [kolla-ansible deploy fails in the keystone role: Fernet bootstrap refused under --limit, key distribution over SSH failing, or keystone waiting for key 0](deployment-errors/keystone-fernet-bootstrap-or-key-distribution-fails.md) | 2026.1 | draft |
+| [kolla-ansible fails with "MariaDB cluster exists but is stopped": recovering a fully stopped Galera cluster with kolla-ansible mariadb-recovery](deployment-errors/mariadb-cluster-exists-but-is-stopped-run-mariadb-recovery.md) | 2026.1 | draft |
 
 | Operations | Releases | Status |
 |---|---|---|
@@ -94,6 +96,7 @@ wrong, version notes, lessons learned, validity and limits.
 | [Rotating the secrets in passwords.yml. Which ones a reconfigure applies, which need manual steps, and which need an outage](configuration/rotating-secrets-in-passwords-yml.md) | 2026.1 | draft |
 | [CPU pinning, huge pages and NUMA on Kolla-Ansible computes. Host preparation, nova.conf overrides and the scheduler filter Kolla-Ansible does not enable](configuration/cpu-pinning-hugepages-and-numa-on-computes.md) | 2026.1 | draft |
 | [TLS on the internal and external endpoints. What each switch encrypts, where the certificates go, and what changes on a running platform](configuration/tls-on-internal-and-external-endpoints.md) | 2026.1 | draft |
+| [SR-IOV with Kolla-Ansible. VFs on the host, the Neutron SR-IOV agent, the PCI whitelist Kolla-Ansible writes, and the scheduler filter](configuration/sriov-neutron-ports-and-nova-pci-alias.md) | 2026.1 | draft |
 | [A local registry and an offline deployment with Kolla-Ansible. What has to be mirrored, the variables that point at the mirrors, and the Docker setting that does not help](configuration/local-registry-and-offline-deployment.md) | 2026.1 | draft |
 
 | Service or integration | Releases | Status |
