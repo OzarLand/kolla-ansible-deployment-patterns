@@ -1,7 +1,7 @@
 ---
 title: kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client". Docker does not know the registry is plain HTTP
 kind: runbook
-status: draft
+status: lab-verified
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, docker]
 deployment_methods: [kolla-ansible]
@@ -11,13 +11,14 @@ environment:
   storage: any
   os: ubuntu-24.04 (noble), docker
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: kolla-ansible all-in-one, date: 2026-10-27, note: "reproduced by emptying insecure-registries and reloading Docker: pull failed with the message inside a docker APIError 500; quick checks, manual daemon.json fix with systemctl reload (no container restarted) and pull --tags common run; not run: bootstrap-servers, a full pull, the other triggers (registry added later, host added)" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/deployment-and-bootstrapping/bootstrap-servers.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/multinode.html
   - https://docs.docker.com/reference/cli/dockerd/#insecure-registries
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client". Docker does not know the registry is plain HTTP
@@ -99,7 +100,8 @@ keeping the other keys of the file, then reload the daemon:
 
 > ⚠️ **State-changing.** Changes Docker's daemon configuration and reloads it. On the lab, `systemctl reload docker`
 > applied `insecure-registries` without restarting any container (31 containers kept running). A
-> `systemctl restart docker` instead restarts every container on the host. Undo: remove the entry and reload again.
+> `systemctl restart docker` instead restarts every container on the host. Undo: remove the entry from the list and
+> reload again (deleting the whole `insecure-registries` key does not: the reload keeps the previous list).
 
 ```bash
 sudo systemctl reload docker
@@ -140,10 +142,28 @@ Docker), step 6 of the upgrade, `pull`:
 
 The [upgrade playbook](../version-notes/2025.1-to-2026.1.md) now applies Docker changes before `pull` (step 5).
 
+Reproduced on 2026-10-27 on another all-in-one lab (Kolla-Ansible 22.2.0, Docker, a plain-HTTP registry
+`<registry-host>:4000` with `docker_registry_insecure: true`), by emptying the daemon's list
+(`"insecure-registries": []` in `daemon.json`, `systemctl reload docker`):
+
+- `kolla-ansible pull -i <inventory> --tags common` failed after 41 s, on the first image, after three retries
+  (`FAILED - RETRYING: [localhost]: Pull images for kolla_toolbox (3 retries left).`), with the message inside a
+  Docker API error: `docker.errors.APIError: 500 Server Error for http+docker://localhost/v1.56/images/create?...`
+  ... `failed to do request: Head "https://<registry-host>:4000/v2/openstack.kolla/kolla-toolbox/manifests/<tag>":
+  http: server gave HTTP response to HTTPS client`; `PLAY RECAP` `failed=1`.
+- The three quick checks showed the case as the page describes: `globals.yml` with the registry and
+  `docker_registry_insecure: true`, neither `docker info` nor `daemon.json` listing it.
+- Putting the entry back and `systemctl reload docker`: listed at once in `docker info`; 40 containers kept running
+  (start times unchanged); `pull` again ended with `failed=0` in 25 s.
+- Deleting the `insecure-registries` key instead of emptying it, then reloading, left the registry listed in `docker
+  info`.
+- `bootstrap-servers` was not run.
+
 ## Validity and limits
 
-- Observed once, on one all-in-one lab, during an upgrade. The other triggers (a registry added later, a host added
-  without `bootstrap-servers`) follow from the same mechanism but were not run.
+- Observed during an upgrade on one all-in-one lab, and reproduced on a second one by removing the registry from
+  the daemon's list (*Lab observations*). The other triggers (a registry added later, a host added without
+  `bootstrap-servers`) follow from the same mechanism but were not run; neither was `bootstrap-servers`.
 - Not covered: Podman (its registry configuration differs), registries with TLS and a private CA, registry
   authentication (the bootstrap servers guide notes that `docker_registry_insecure` disables it), and image mirrors.
 
