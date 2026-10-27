@@ -10,3 +10,4 @@ repository README for what belongs here. Add pages with `templates/deployment-pa
 - [deploy fails with "The following Nova compute services failed to register themselves"](nova-compute-services-failed-to-register.md)
 - [prechecks fails with "Ansible version should be between ...": the wrong Ansible or collections on the deploy host](ansible-version-not-supported-or-wrong-ansible-on-the-deploy-host.md)
 - [RabbitMQ nodes do not form a cluster during deploy](rabbitmq-nodes-do-not-form-a-cluster.md)
+- [deploy fails in the keystone role: Fernet bootstrap, key distribution, or key 0 missing](keystone-fernet-bootstrap-or-key-distribution-fails.md)
