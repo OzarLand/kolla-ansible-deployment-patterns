@@ -1,7 +1,7 @@
 ---
 title: kolla-ansible deploy fails in the keystone role. Fernet bootstrap refused under --limit, key distribution over SSH failing, or keystone waiting for key 0
 kind: runbook
-status: draft
+status: lab-verified
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, keystone, docker]
 deployment_methods: [kolla-ansible]
@@ -11,7 +11,8 @@ environment:
   storage: any
   os: any host OS supported by the Kolla-Ansible release
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, multinode (3 controllers, 2 computes)", date: 2026-10-27, note: "cause 1 (every keystone_fernet stopped, deploy with --limit) and its start-then-deploy resolution; cause 2 simulated with a DROP of port 8023 on one controller, resolved by removing it during the wait; cause 3 (keys removed on one host) with steps 1-4; quick checks and Verification run; start/stop with systemctl, not docker. A first deployment with --limit, kolla_serial, a bootstrap on an empty cluster, a push from an empty host, a different keystone_ssh_key and keystone_ssh stopped not run" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/shared-services/keystone-guide.html
   - https://docs.openstack.org/kolla-ansible/2026.1/admin/password-rotation.html
@@ -28,12 +29,15 @@ One of these, during `kolla-ansible deploy`, `reconfigure` or `upgrade`, in the 
 
 ```text
 TASK [keystone : Fail if any hosts need bootstrapping and not all hosts targeted] ****
-fatal: [controller-1]: FAILED! => {"changed": false, "msg": "Some hosts (controller-1, controller-2, controller-3) need Fernet key bootstrapping, but not all Keystone hosts are in the target list. Stopping as it may be unsafe to proceed. Please run without --limit or --serial to bootstrap these hosts."}
+[ERROR]: Task failed: Action failed: Some hosts (controller-1) need Fernet key bootstrapping, but not all Keystone hosts are in the target list. ...
+fatal: [controller-1]: FAILED! => {"changed": false, "msg": "Some hosts (controller-1) need Fernet key bootstrapping, but not all Keystone hosts are in the target list. Stopping as it may be unsafe to proceed. Please run without --limit or --serial to bootstrap these hosts.\n"}
 ```
 
 ```text
 TASK [keystone : Waiting for Keystone SSH port to be UP] ****
-FAILED - RETRYING: ...
+ok: [controller-2]
+ok: [controller-1]
+FAILED - RETRYING: [controller-3]: Waiting for Keystone SSH port to be UP (10 retries left).
 TASK [keystone : Run fernet key distribution] ****
 fatal: [controller-1]: FAILED! => ... "cmd": "docker exec -t keystone_fernet /usr/bin/fernet-push.sh" ...
 ```
@@ -48,7 +52,9 @@ CRITICAL: Waited for 3 minutes - failing
 
 The task names and messages are those of `ansible/roles/keystone/tasks/bootstrap_service.yml`,
 `distribute_fernet.yml` and `templates/keystone-startup.sh.j2` in Kolla-Ansible 2026.1. The surrounding Ansible
-output is reconstructed, not copied from a run.
+output is reconstructed, not copied from a run, except the bootstrap message, the `RETRYING` line and the
+`keystone` log lines, which were captured on a lab (see *Lab observations*). The bootstrap message names only the
+hosts in the run.
 
 ## Impact
 
@@ -91,7 +97,8 @@ How Kolla-Ansible 2026.1 handles Fernet keys, from the `keystone` role:
   include every Keystone host (`--limit`, or a batch with `kolla_serial`), the role stops on purpose, because, in its
   own words, bootstrapping keys on an existing cluster "would overwrite existing keys, and invalidate tokens created
   from them".
-- **Distribution:** the role waits for the `keystone_ssh` port on each host (10 tries, 5 seconds apart), then runs
+- **Distribution:** the role waits for the `keystone_ssh` port on each host (10 tries, 5 seconds apart; each host
+  checks its own `api_interface_address`, and each try can last up to `wait_for`'s default timeout of 300 s), then runs
   `fernet-push.sh` once, in `keystone_fernet`, on **the first Keystone host in inventory order whose
   `keystone_fernet` container was running** when the role checked (`keystone_fernet_running_True`), or the first
   Keystone host if none was. The script does an `rsync --delete` of `/etc/keystone/fernet-keys/` over SSH to every
@@ -138,17 +145,17 @@ first, so that the role sees them running and does not bootstrap. Check each hos
 container is stopped, so look at the volume):
 
 ```bash
-sudo ls -l /var/lib/docker/volumes/keystone_fernet_tokens/_data/    # expected: files 0, 1, ... owned by the keystone user
+sudo ls -l /var/lib/docker/volumes/keystone_fernet_tokens/_data/    # expected: files 0, 1, ... owned by the keystone user (42425 on the host)
 # with Podman: /var/lib/containers/storage/volumes/keystone_fernet_tokens/_data/
 ```
 
 > ⚠️ **State-changing.** Starts the stopped `keystone_fernet` container of a host; nothing else. Start it **only on
 > hosts whose key directory is not empty**: the first running one becomes the source of the next push, which deletes
-> on the other hosts whatever it does not have. Undo: `docker stop keystone_fernet`.
+> on the other hosts whatever it does not have. Undo: `sudo systemctl stop kolla-keystone_fernet-container.service`.
 
 ```bash
 # on each Keystone host whose key directory holds keys, if the container exists but is stopped
-sudo docker start keystone_fernet
+sudo systemctl start kolla-keystone_fernet-container.service    # Kolla-Ansible 2026.1: systemd units, not docker start
 ```
 
 > ⚠️ **State-changing.** A full run of the keystone role on every host. If no `keystone_fernet` runs anywhere, it
@@ -177,11 +184,11 @@ Make sure the push will come from a host that has the keys, then let the role re
    cron rotation:
 
    > ⚠️ **State-changing.** Stops `keystone_fernet` on the host with no keys: its rotation and pushes stop; its
-   > `keystone` API was already failing without keys. The deploy below starts it again. Undo: `docker start
-   > keystone_fernet`.
+   > `keystone` API was already failing without keys. The deploy below starts it again. Undo: `sudo systemctl start
+   > kolla-keystone_fernet-container.service`.
 
    ```bash
-   sudo docker stop keystone_fernet
+   sudo systemctl stop kolla-keystone_fernet-container.service
    ```
 
 2. Check that at least one other Keystone host has a running `keystone_fernet` and a full key directory (the
@@ -207,12 +214,33 @@ openstack token issue
 openstack project list
 ```
 
+## Lab observations
+
+OpenStack 2026.1, Kolla-Ansible 22.2.0 (ansible-core output format), 3 controllers with Keystone, 2026-10-27.
+
+- Cause 1: `keystone_fernet` stopped with `systemctl` on the three controllers, then `kolla-ansible deploy --tags
+  keystone --limit controller-1`: failed in 49 s at *Fail if any hosts need bootstrapping and not all hosts
+  targeted*, message as shown in *Symptom* (only the targeted host named). No key was touched. The volume paths
+  showed `0` and `1` owned by `42425`; `systemctl start` on the three hosts made them `healthy`.
+- Cause 2, simulated with an `iptables` DROP of port 8023 on controller-3: `fernet-healthcheck.sh` on controller-1
+  exited 1 and `nc` timed out. The full `deploy --tags keystone` then sat in *Waiting for Keystone SSH port to be UP*:
+  three `FAILED - RETRYING` lines for controller-3 in about 18 minutes, consistent with 300 s per try (10 retries
+  would take about 55 minutes before the failure). After the rule was removed, the next try passed, the
+  distribution ran, and the deploy ended with no failure.
+- Cause 3: the key directory of controller-3 emptied, `keystone` restarted there: `ERROR: Fernet keys have not been
+  populated, rechecking in 5 seconds`, then `CRITICAL: Waited for 3 minutes - failing` and the container exited;
+  tokens kept working through the other two hosts. Steps 1 to 4 ran as written (with `systemctl stop`): the deploy
+  took 1.5 minutes, the push ran from controller-1, and the three hosts ended with the same two key hashes,
+  `fernet-healthcheck.sh` exit 0, and `token issue` / `project list` working six times out of six.
+- Not run: a first deployment with `--limit`, a run with `kolla_serial`, a bootstrap on an empty cluster, a push
+  from an empty host, a different `keystone_ssh_key`, and `keystone_ssh` stopped.
+
 ## Validity and limits
 
 - Written from Kolla-Ansible 2026.1 code (`ansible/roles/keystone/tasks/bootstrap_service.yml`,
   `distribute_fernet.yml`, `config.yml`, `templates/fernet-*.sh.j2`, `templates/keystone-startup.sh.j2`,
-  `defaults/main.yml`, `ansible/group_vars/all/keystone.yml`) and the Keystone Fernet FAQ. Not reproduced on a lab
-  for this page. Status `draft`.
+  `defaults/main.yml`, `ansible/group_vars/all/keystone.yml`) and the Keystone Fernet FAQ. Reproduced on a lab for the
+  three causes, as described in *Lab observations*.
 - `sha256sum` of the key files is used to compare hosts without printing the keys; never paste the keys anywhere.
 - Not covered: rotating `keystone_ssh_key` (see the password rotation guide), federation, Keystone behind an external
   load balancer, and Podman.
