@@ -306,11 +306,14 @@ pushes includes `heartbeat_key` (`octavia/amphorae/backends/agent/agent_jinja_cf
 > ⚠️ **State-changing.** Rewrites the agent configuration inside one running amphora. Amphorae built from an image
 > whose agent does not support it log an error on the controller and are not changed (release note). Not tested
 > here, including the order to follow: controllers first then amphorae, or the reverse, and what the health managers
-> accept in between. Try it on a lab first. An earlier version of this API updated only the agent configuration, not
-> the running health sender (release note *Fix-Amphora-Config-Update*): with an older amphora image, do not assume the
-> new key reached the heartbeats. Undo: put the previous key back in the override, run `reconfigure --tags octavia`
-> and `amphora configure` again, or fail the amphora over (`openstack loadbalancer amphora failover <amphora-id>`) so
-> that it is rebuilt with the controllers' current configuration.
+> accept in between. Try it on a lab first. In an earlier version, the health sender did not reload its configuration
+> after the update (release note *Fix-Amphora-Config-Update*, which names the controller IP list; the key is read from
+> the same configuration): with an older amphora image, do not assume the new key reached the heartbeats. Undo: put
+> the previous key back in the override, run `reconfigure --tags octavia` and `amphora configure` again, or fail the
+> amphora over (`openstack loadbalancer amphora failover <amphora-id>`) so that it is rebuilt with the controllers'
+> current configuration. A failover is itself state-changing: it deletes the amphora and builds a new one; with the
+> `SINGLE` topology the load balancer's traffic stops until the replacement is `ACTIVE`, with `ACTIVE_STANDBY` the VIP
+> moves to the other amphora first. Fail over one amphora at a time.
 
 ```bash
 openstack loadbalancer amphora configure <amphora-id>
