@@ -103,6 +103,8 @@ Kolla-Ansible (cron or a timer on the deploy host). Then copy the new files off 
 ```bash
 # on the backup host: list what is there
 sudo ls -lh /var/lib/docker/volumes/mariadb_backup/_data/
+# copy them to storage outside the cluster (the destination is yours to choose)
+sudo rsync -a /var/lib/docker/volumes/mariadb_backup/_data/ <backup-user>@<backup-server>:<backup-path>/
 ```
 
 Test a restore on a lab from time to time: an untested backup is a hope, not a backup.
@@ -207,6 +209,9 @@ your release.
 > done on every other node. If a node still refuses to join, read `docker logs mariadb` and
 > `/var/log/kolla/mariadb/mariadb.log` on it before doing anything else: a line saying that the states diverged, or
 > `Local state seqno ... is greater than group seqno`, means its data was not cleared.
+> A full state transfer of a large database can outlast the role's waits (about 11 minutes for a joiner's port, about
+> 5 minutes for `Synced`): if `mariadb-recovery` times out on a joiner, check `docker logs mariadb` there for the
+> transfer's progress before running it again.
 
 ```bash
 kolla-ansible mariadb-recovery -i <inventory> -e mariadb_recover_inventory_name=<first-mariadb-host>

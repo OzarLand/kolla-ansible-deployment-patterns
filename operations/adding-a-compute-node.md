@@ -115,7 +115,10 @@ ansible -i <inventory> compute-03 -m ping                 # the deploy host reac
 ```
 
 **2. Prepare the new host.** `bootstrap-servers` installs Docker and the host packages Kolla-Ansible needs, and
-writes `/etc/hosts` entries.
+writes `/etc/hosts` entries. For compute nodes, the upstream guide says that the limit of `pull` and `deploy` only
+needs the new hosts; for `bootstrap-servers` it shows an optional `--limit`, and limiting it to the new host is what
+keeps the running hosts out of it. Its play gathers facts for every host of the inventory, like `deploy` (see *What
+went wrong* below): an unreachable host makes it fail.
 
 > ⚠️ **State-changing.** Installs packages and configures Docker on the hosts in the limit. Limited to the new host,
 > it changes nothing on the running ones. Without `--limit`, it runs on every host, can upgrade or restart Docker
