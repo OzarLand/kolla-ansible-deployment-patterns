@@ -11,13 +11,14 @@ environment:
   storage: any
   os: any deploy host OS; Python virtual environment as in the quickstart
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0 all-in-one, deploy host on the node", date: 2026-10-27, note: "causes 1 and 2 reproduced (venv not active; ansible-core 2.18.10 in the venv) and fixed; the pip install needed a copied wheel (no PyPI access on the lab); cause 3 (install-deps, separate collections path) not run, read-only collection check only" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/user/quickstart.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/virtual-environments.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # kolla-ansible prechecks fails with "Ansible version should be between ...": the wrong Ansible or collections on the deploy host
@@ -28,14 +29,19 @@ last_verified: 2026-10-26
 time, ports, services), with:
 
 ```text
-TASK [prechecks : Checking Ansible version] ****
-fatal: [controller-1]: FAILED! => {"assertion": "...", "changed": false, "evaluated_to": false,
-  "msg": "Ansible version should be between 2.19 and 2.20. Current version is 2.16.3 which is not supported."}
+TASK [prechecks : Checking Ansible version] ************************************
+fatal: [localhost]: FAILED! => {
+    "assertion": "ansible_version_host is version(ansible_version_min, '>=')",
+    "changed": false,
+    "evaluated_to": false,
+    "msg": "Ansible version should be between 2.19 and 2.20. Current version is 2.18.10 which is not supported."
+}
 ```
 
-The task name and the message are those of `ansible/roles/prechecks/tasks/package_checks.yml` in Kolla-Ansible
-2026.1 (the surrounding JSON is reconstructed, not copied from a run); the bounds come from `ansible_version_min: '2.19'` and `ansible_version_max: '2.20'` in the prechecks role. The
-current version shown here is an example.
+Captured on an all-in-one lab (Kolla-Ansible 22.2.0) with `ansible-core` 2.18.10 installed into the virtual
+environment; the run stopped after 8 seconds with `failed=1`. The task and the message are those of
+`ansible/roles/prechecks/tasks/package_checks.yml` in Kolla-Ansible 2026.1; the bounds come from
+`ansible_version_min: '2.19'` and `ansible_version_max: '2.20'` in the prechecks role.
 
 Related forms of the same problem, on any command (`deploy`, `reconfigure`, `upgrade`), when prechecks were skipped:
 
@@ -93,7 +99,13 @@ Three facts from the 2026.1 code explain most cases:
 ### Cause 1: the virtual environment is not active
 
 `kolla-ansible` runs, but `ansible-playbook` comes from elsewhere. Tell it apart: `command -v ansible-playbook` is not
-in `/path/to/venv/bin/`.
+in `/path/to/venv/bin/`. If there is no other `ansible-playbook` in the `PATH`, `kolla-ansible` called by its full
+path stops at once, before any play (seen on the lab):
+
+```text
+Pre-deployment checking
+[Errno 2] No such file or directory: 'ansible-playbook'
+```
 
 ### Cause 2: the wrong ansible-core in the virtual environment
 
@@ -106,7 +118,10 @@ it apart: `pip show ansible-core` in the environment gives a version outside 2.1
 later for the same user. Tell it apart: the versions in `ansible-galaxy collection list` do not satisfy the bounds in
 `/path/to/venv/share/kolla-ansible/requirements-core.yml`, or the `openstack.kolla` collection is missing or comes
 from another release. That collection is installed from Git (`requirements.yml` names `ansible-collection-kolla` at
-`stable/2026.1` for 2026.1): its branch, not a version range, must match the release.
+`stable/2026.1` for 2026.1): its branch, not a version range, must match the release. On the lab,
+`ansible-galaxy collection list` showed it as `openstack.kolla 1.0.0`, which does not name the branch, and unlike the
+Galaxy collections it has no `.info` directory next to it; rerunning `install-deps` from the right environment is
+the way to be sure.
 
 ## Resolution
 
@@ -132,6 +147,11 @@ upgrades only:
 source /path/to/venv/bin/activate
 pip install 'ansible-core>=2.19,!=2.19.0,<2.21'        # the 2026.1 range; read requirements.txt of your release
 ```
+
+A deploy host without access to PyPI gets `ERROR: No matching distribution found for
+ansible-core!=2.19.0,<2.21,>=2.19`. On the lab, the wheel of the version the release had installed (2.20.10) was
+downloaded elsewhere, copied over and installed with `pip install --no-deps <wheel file>`; its dependencies were still
+in the environment.
 
 ### For cause 3
 
@@ -161,8 +181,12 @@ kolla-ansible prechecks -i <inventory>            # passes "Checking Ansible ver
 
 - Written from the Kolla-Ansible 2026.1 code (`ansible/roles/prechecks/tasks/package_checks.yml`,
   `ansible/roles/prechecks/vars/main.yml`, `requirements.txt`, `requirements.yml`, `requirements-core.yml`,
-  `kolla_ansible/ansible.py`, `kolla_ansible/utils.py`) and the quickstart and operating guides. Not reproduced on a
-  lab for this page. Status `draft`.
+  `kolla_ansible/ansible.py`, `kolla_ansible/utils.py`) and the quickstart and operating guides.
+- Lab run (Kolla-Ansible 22.2.0, all-in-one, deploy host = the node): the quick checks; cause 1 (full path without the
+  environment, no other Ansible on the host); cause 2 (`ansible-core` 2.18.10 in the environment: the symptom above),
+  fixed by installing 2.20.10 back from a wheel (no PyPI access), then `prechecks` passed (`failed=0`). Not run:
+  `kolla-ansible install-deps` (cause 3; no direct Internet access on the lab), the separate collections path, and the
+  missing-module and syntax forms of the problem.
 - Ansible's own error messages for missing collections or unsupported syntax vary by version and are described, not
   quoted.
 - Not covered: Kolla-Ansible installed from a distribution package or a container image, and Ansible configuration
