@@ -114,12 +114,14 @@ Read the files it lists; an `ERROR` right after a restart (a reconnection) can b
 openstack server create --flavor <small-flavor> --image <image> --network <network> --wait check-after-change
 openstack server show check-after-change -c status -c addresses -c OS-EXT-SRV-ATTR:host
 openstack console log show check-after-change | tail -20     # see below
-openstack server delete --wait check-after-change
 
 # only if you test external access
 openstack floating ip create <external-network>                     # note the address it returns
-openstack server add floating ip check-after-change <floating-ip>   # before the delete above
-openstack floating ip delete <floating-ip>                          # after the test
+openstack server add floating ip check-after-change <floating-ip>
+#   ... test access to <floating-ip> ...
+openstack floating ip delete <floating-ip>
+
+openstack server delete --wait check-after-change
 ```
 
 In the console log, an image with cloud-init shows its final `finished` line after reading the metadata; a CirrOS
