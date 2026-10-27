@@ -123,15 +123,39 @@ sudo cp -a /var/lib/docker/volumes/mariadb/_data /var/lib/mariadb-before-recover
 kolla-ansible mariadb-recovery -i <inventory>
 ```
 
-To force the node to bootstrap from, when you know better than the `seqno` comparison (for example after a restore
-from a backup on that node):
+The role waits for the bootstrap node to be `OPERATIONAL`, for each other node to be `Synced` (the others replace
+their data by an incremental or full state transfer), then restarts the bootstrap node normally, so that no node keeps
+the bootstrap setting. The role's waits are about 10 × 6 seconds for a joiner's port and 30 × 10 seconds for
+`Synced`; a full transfer of a large database can take longer. If the run times out on a joiner, read
+`docker logs mariadb` there for the transfer's progress before running anything again.
+
+**3. Check which host was chosen, and why** (read-only). The role writes the chosen host to
+`/tmp/kolla_mariadb_recover_inventory_name_<shard>` on the deploy host. On each node, the position the comparison
+used is the last `Recovered position` line of the MariaDB log:
+
+```bash
+grep 'Recovered position' /var/log/kolla/mariadb/mariadb.log | tail -n 1
+```
+
+The comparison has blind spots: a node whose recovery wrote no `Recovered position` line gets an empty `seqno`, is
+skipped by every comparison and can end up chosen itself; and the role reads the whole log, so the last line may come
+from an earlier run. If the chosen host's line is missing or older than this run, stop and look before the services
+start writing again.
+
+**Forcing the bootstrap host.** `-e mariadb_recover_inventory_name=<host>` names the host to bootstrap from instead.
+
+> 🛑 **Destructive.** Skips the `seqno` comparison entirely (`recover_cluster.yml` does not run the wsrep recovery
+> block when a host is named): the named host is bootstrapped and the other nodes are started as they are, with their
+> own data. Every transaction newer than the named host's position is lost. Nodes whose position is ahead of it
+> normally refuse to join (Galera reports that the states diverged, or `Local state seqno ... is greater than group
+> seqno`) instead of taking a state transfer, unless their data directory is emptied first. Use it only when you know
+> the named host is the right source, for example after restoring a backup on it, and then follow the
+> [backup and restore page](../operations/mariadb-backup-and-restore-with-mariabackup.md), which empties the other
+> nodes first. Precondition: step 1 done on every node. Undo: only by restoring the copies of step 1.
 
 ```bash
 kolla-ansible mariadb-recovery -i <inventory> -e mariadb_recover_inventory_name=<mariadb-host>
 ```
-
-The role waits for the bootstrap node to be `OPERATIONAL`, for each other node to be `Synced`, then restarts the
-bootstrap node normally, so that no node keeps the bootstrap setting.
 
 ### For cause 2
 
@@ -141,7 +165,7 @@ space, the log). Do not run `mariadb-recovery` while a node is serving data: it 
 ## Verification
 
 ```bash
-# on each MariaDB host; the password is database_password in passwords.yml
+# on each MariaDB host; -p prompts for database_password from passwords.yml (database_user, root by default)
 sudo docker exec -it mariadb mariadb -uroot -p -e "SHOW STATUS WHERE Variable_name IN ('wsrep_cluster_size','wsrep_cluster_status','wsrep_local_state_comment');"
 # expected: wsrep_cluster_size = number of MariaDB hosts, Primary, Synced
 
