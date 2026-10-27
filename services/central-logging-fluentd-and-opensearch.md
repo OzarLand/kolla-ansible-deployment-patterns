@@ -14,7 +14,6 @@ environment:
 risk: state-changing
 confirmed_by:
   - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0 all-in-one, ML2/OVS, enable_haproxy no", date: 2026-10-27, note: "deploy, verification, searches 1 (API), 2, 3, 4 (with sh -c) and the undo run on a disposable lab, one OpenSearch node; HAProxy frontends and their removal not run (no HAProxy on the lab); Dashboards UI not opened; journal shipping observed not working" }
-  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0 all-in-one, ML2/OVS, enable_haproxy no", date: 2026-10-27, note: "deploy, verification, searches 1 (API), 2, 3, 4 (with sh -c) and the undo run on a disposable lab, one OpenSearch node; HAProxy frontends and their removal not run (no HAProxy on the lab); Dashboards UI not opened; journal shipping observed not working" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/logging-and-monitoring/central-logging-guide.html
   - https://opensearch.org/docs/latest/im-plugin/index/
