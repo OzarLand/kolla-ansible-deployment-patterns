@@ -6,3 +6,4 @@ with `templates/deployment-pattern.md`.
 
 - [Octavia with the amphora provider: certificates, the management network and the amphora image](octavia-amphora-certificates-and-management-network.md)
 - [Monitoring with Prometheus, Grafana and Alertmanager: what is deployed, and the rules, receivers and dashboards you still have to bring](monitoring-prometheus-grafana-and-alerting.md)
+- [External Ceph for Glance, Cinder, Cinder backup and Nova: pools, users, the files Kolla-Ansible expects, and the libvirt secrets](external-ceph-for-glance-cinder-and-nova.md)
