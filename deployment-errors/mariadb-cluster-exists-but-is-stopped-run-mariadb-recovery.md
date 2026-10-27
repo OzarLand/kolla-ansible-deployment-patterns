@@ -1,0 +1,177 @@
+---
+title: kolla-ansible fails with "MariaDB cluster exists but is stopped". Recovering a fully stopped Galera cluster with kolla-ansible mariadb-recovery
+kind: runbook
+status: draft
+openstack_releases: ["2026.1"]
+components: [kolla-ansible, mariadb, docker]
+deployment_methods: [kolla-ansible]
+environment:
+  topology: two or more hosts in the mariadb group (a Galera cluster); typically after a power loss or all controllers rebooted
+  network: any
+  storage: any
+  os: any host OS supported by the Kolla-Ansible release
+risk: destructive
+confirmed_by: []
+upstream_refs:
+  - https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html
+  - https://docs.openstack.org/kolla-ansible/2026.1/admin/mariadb-backup-and-restore.html
+  - https://galeracluster.com/library/documentation/crash-recovery.html
+  - https://mariadb.com/kb/en/getting-started-with-mariadb-galera-cluster/
+authored_by: agent:ozarland-author
+last_verified: 2026-10-27
+---
+
+# kolla-ansible fails with "MariaDB cluster exists but is stopped"
+
+## Symptom
+
+After every controller was down at the same time (power loss, all rebooted, every `mariadb` container stopped),
+MariaDB does not come back by itself, the OpenStack APIs return errors, and any `kolla-ansible deploy`,
+`reconfigure` or `upgrade` stops in the `mariadb` role with:
+
+```text
+TASK [mariadb : Fail on existing but stopped cluster] ****
+fatal: [controller-1]: FAILED! => {"changed": false, "msg": "MariaDB cluster exists but is stopped. Please start it using kolla-ansible mariadb-recovery"}
+```
+
+The task name and message are those of `ansible/roles/mariadb/tasks/lookup_cluster.yml` in Kolla-Ansible 2026.1.
+The task fails when the inventory has more than one MariaDB host, every host already has a `mariadb` volume, and
+none answers on the MariaDB port.
+
+## Impact
+
+Every OpenStack service that uses the database is down or failing: the API calls fail, nothing can be created,
+changed or deleted. Running instances keep running. Data is not lost yet; the risk is in recovering the wrong way.
+
+## Quick checks
+
+On each MariaDB host, read-only:
+
+```bash
+# 1. Container state: exited, restarting, or running but not serving?
+sudo docker ps -a --format '{{.Names}}\t{{.Status}}' | grep -w mariadb
+
+# 2. Galera's saved state on each node: seqno and safe_to_bootstrap
+sudo cat /var/lib/docker/volumes/mariadb/_data/grastate.dat
+
+# 3. The end of the MariaDB log
+sudo tail -n 50 /var/log/kolla/mariadb/mariadb.log
+```
+
+From the deploy host, read-only, for each MariaDB host:
+
+```bash
+# 4. Does it answer on the MariaDB port (3306 by default, mariadb_port)?
+nc -zv -w 3 <controller-api-address> 3306
+```
+
+## Diagnosis
+
+Galera keeps a node running only while it belongs to a primary component, a majority of the cluster. When every node
+stopped, none of them may start alone: each waits for the others, and a plain restart of the containers does not
+form a cluster. One node must be started as a new cluster (bootstrapped), and it must be the node with the most
+recent data, the highest sequence number (`seqno`). The others then join it and copy what they miss.
+
+`grastate.dat` gives that number when the node stopped cleanly. After a crash it reads `seqno: -1`, and the real
+position must be recovered from the data files (`mysqld --wsrep-recover`, which writes `Recovered position:
+<uuid>:<seqno>` in the log). `kolla-ansible mariadb-recovery` does exactly this on every node and picks the highest.
+
+What to read in `mariadb.log` (messages of MariaDB and Galera; their exact wording depends on the version):
+`WSREP: Recovered position`, errors about `safe_to_bootstrap`, `failed to reach primary view`, or a node waiting for
+the others.
+
+## Possible causes
+
+### Cause 1: every node stopped at about the same time
+
+Power loss, a simultaneous reboot of all controllers (for example during patching without a rolling order), or the
+MariaDB containers stopped together (`kolla-ansible stop`). The cluster has no primary component left. This is the
+case `mariadb-recovery` is made for (the operating guide: "used to recover a completely stopped mariadb cluster").
+
+### Cause 2: some nodes are up but not in a primary component
+
+If one node answers on the port but is not `Synced`, the same roles fail earlier with `MariaDB cluster is not synced.
+Please wait for WSREP sync before proceeding.`, not with this message. Look at that node first
+(`SHOW STATUS LIKE 'wsrep_%'`) before running a recovery that restarts every node.
+
+## Resolution
+
+### For cause 1
+
+**1. Save the data of every node first.** The recovery bootstraps from one node and the others are then overwritten
+by a state transfer from it.
+
+> ⚠️ **State-changing.** Stops a `mariadb` container that is still restarting, then copies its data aside; no data is
+> changed. Needs free space equal to the data size on each node. Undo: `docker start mariadb` (the copy can stay).
+
+```bash
+sudo docker ps -a --filter name=mariadb --format '{{.Names}}\t{{.Status}}'   # read-only
+sudo docker stop mariadb            # only if it shows Restarting or Up
+sudo cp -a /var/lib/docker/volumes/mariadb/_data /var/lib/mariadb-before-recovery-$(date +%F)
+```
+
+**2. Run the recovery.**
+
+> 🛑 **Destructive.** Starts a new Galera cluster from one node's data. Kolla-Ansible stops MariaDB on every node,
+> runs `--wsrep-recover` on each to find its position, picks the host with the highest `seqno`, sets
+> `safe_to_bootstrap: 1` in its `grastate.dat`, starts it with `--wsrep-new-cluster`, then starts the others, which
+> replace their data by a state transfer from it. Any transaction that only a node with a lower `seqno` had is lost.
+> Precondition: step 1 done on every node; every MariaDB host reachable by Ansible (a host left out cannot be
+> compared). Undo: only by restoring the copies of step 1 (stop all nodes, copy back, recover from the chosen node).
+
+```bash
+kolla-ansible mariadb-recovery -i <inventory>
+```
+
+To force the node to bootstrap from, when you know better than the `seqno` comparison (for example after a restore
+from a backup on that node):
+
+```bash
+kolla-ansible mariadb-recovery -i <inventory> -e mariadb_recover_inventory_name=<mariadb-host>
+```
+
+The role waits for the bootstrap node to be `OPERATIONAL`, for each other node to be `Synced`, then restarts the
+bootstrap node normally, so that no node keeps the bootstrap setting.
+
+### For cause 2
+
+Wait for the node to finish its state transfer, or find why it cannot join (network between the controllers, disk
+space, the log). Do not run `mariadb-recovery` while a node is serving data: it restarts every node.
+
+## Verification
+
+```bash
+# on each MariaDB host; the password is database_password in passwords.yml
+sudo docker exec -it mariadb mariadb -uroot -p -e "SHOW STATUS WHERE Variable_name IN ('wsrep_cluster_size','wsrep_cluster_status','wsrep_local_state_comment');"
+# expected: wsrep_cluster_size = number of MariaDB hosts, Primary, Synced
+
+openstack token issue        # Keystone answers again
+openstack server list --all-projects --limit 5
+```
+
+Then a `kolla-ansible deploy` or `reconfigure` goes past *Fail on existing but stopped cluster*.
+
+## Validity and limits
+
+- Written from Kolla-Ansible 2026.1 code (`ansible/mariadb-recovery.yml`, `ansible/roles/mariadb/tasks/lookup_cluster.yml`
+  and `recover_cluster.yml`) and its operating and backup guides, with Galera's crash recovery documentation for the
+  background. Not reproduced on a lab for this page. Status `draft`.
+- Docker paths (`/var/lib/docker/volumes/...`); with Podman, check the volume path.
+- Not covered: several shards (the recovery works per shard group), external databases, a cluster split by a network
+  partition where some nodes still serve (cause 2), and data corruption, for which the
+  [backup and restore page](../operations/mariadb-backup-and-restore-with-mariabackup.md) applies.
+
+## Related
+
+- [Backing up and restoring MariaDB](../operations/mariadb-backup-and-restore-with-mariabackup.md)
+- [deploy fails part-way because Ubuntu upgraded packages during the deploy](unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md)
+- Kolla-Ansible 2026.1: [operating Kolla](https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html)
+- Galera: [crash recovery](https://galeracluster.com/library/documentation/crash-recovery.html)
+
+---
+
+*Provenance: written by agent:ozarland-author, from the Kolla-Ansible 2026.1 code and documentation and the Galera
+documentation. Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=deployment-errors/mariadb-cluster-exists-but-is-stopped-run-mariadb-recovery.md&title=Feedback%3A+deployment-errors/mariadb-cluster-exists-but-is-stopped-run-mariadb-recovery.md):
+your release, your topology, and what happened.

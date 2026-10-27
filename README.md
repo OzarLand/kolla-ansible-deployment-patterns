@@ -73,6 +73,7 @@ wrong, version notes, lessons learned, validity and limits.
 | [kolla-ansible deploy times out at "Wait for haproxy to listen on VIP": the internal VIP never comes up, or cannot be reached](deployment-errors/deploy-times-out-waiting-for-haproxy-on-the-internal-vip.md) | 2026.1 | draft |
 | [kolla-ansible deploy fails with "The following Nova compute services failed to register themselves"](deployment-errors/nova-compute-services-failed-to-register.md) | 2026.1 | draft |
 | [kolla-ansible prechecks fails with "Ansible version should be between ...", or plays fail on missing modules: the wrong Ansible or collections on the deploy host](deployment-errors/ansible-version-not-supported-or-wrong-ansible-on-the-deploy-host.md) | 2026.1 | draft |
+| [kolla-ansible fails with "MariaDB cluster exists but is stopped": recovering a fully stopped Galera cluster with kolla-ansible mariadb-recovery](deployment-errors/mariadb-cluster-exists-but-is-stopped-run-mariadb-recovery.md) | 2026.1 | draft |
 
 | Operations | Releases | Status |
 |---|---|---|
