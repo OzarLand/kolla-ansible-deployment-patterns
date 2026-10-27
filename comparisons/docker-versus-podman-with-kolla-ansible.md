@@ -51,7 +51,7 @@ migration between them costs. It does not recommend one.
 | Aspect | Docker | Podman |
 |---|---|---|
 | Engine process | A daemon, `dockerd`, that all containers depend on | No central daemon; each container is started by Podman under its systemd unit |
-| Restarting the engine | `systemctl restart docker` stops and starts every container of the host, unless Docker's `live-restore` is used (the bootstrap servers guide warns about it) | No daemon to restart; upgrading the Podman package does not by itself restart running containers |
+| Restarting the engine | `systemctl restart docker` restarts every container of the host (they stop with the daemon and come back through their systemd units), unless Docker's `live-restore` is used (the bootstrap servers guide warns about it) | No daemon to restart; upgrading the Podman package does not by itself restart running containers |
 | Volume path on the host | `/var/lib/docker/volumes/<volume>/_data` (`docker_volumes_path`) | `/var/lib/containers/storage/volumes/<volume>/_data` (`podman_volumes_path`) |
 | Commands in runbooks | `docker ps`, `docker logs`, `docker exec` | `podman ps`, `podman logs`, `podman exec` (the troubleshooting guide says to use `podman` instead of `docker` where applicable) |
 | Registry configuration | Docker's daemon configuration (`daemon.json`: `insecure-registries`, mirrors), written by `bootstrap-servers` | Podman's own registries configuration; how `bootstrap-servers` handles it lives in the `openstack.kolla` collection and was not checked here |
@@ -63,13 +63,11 @@ operator translates them: same subcommands, the other volume path.
 
 ## Migrating from one to the other
 
-The advanced configuration guide describes a supported migration, in both directions:
-
-1. Set `kolla_container_engine` to the new engine in `globals.yml`; change nothing else.
-2. Stop every virtual machine of the cloud: the guide says rolling migration is not supported and the migration can
-   fail otherwise.
-3. Run `kolla-ansible migrate-container-engine`. The playbook prepares the hosts (`container-engine-migration` role),
-   redeploys everything with the new engine (`site.yml` with `kolla_action: deploy`), then runs `post-deploy`.
+The advanced configuration guide describes a supported migration, in both directions. In outline: the operator
+changes `kolla_container_engine` in `globals.yml` and nothing else, stops every virtual machine of the cloud (the guide
+says rolling migration is not supported and the migration can fail otherwise), and runs the guide's
+`migrate-container-engine` command. Its playbook prepares the hosts (`container-engine-migration` role), redeploys
+everything with the new engine (`site.yml` with `kolla_action: deploy`), then runs `post-deploy`.
 
 The guide warns that the container volumes are migrated to the new engine, and that the old engine's packages are
 removed from the system **with all their resources and data**. So: a full outage of every instance, and a backup of
@@ -81,7 +79,7 @@ commands for it on purpose: follow the guide of your release, on a lab first.
 
 | Docker | Podman |
 |---|---|
-| The default: most examples, runbooks and upstream CI coverage use it | Fewer examples; every Docker command in a runbook needs translating |
+| The default: most examples and runbooks use it | Fewer examples; every Docker command in a runbook needs translating |
 | One daemon to watch; one restart that can restart every container | No daemon whose restart takes every container down; more units to look at |
 | `daemon.json` handled by `bootstrap-servers` | Registry settings in Podman's own configuration |
 | Moving away later is a full outage (migration) | Same in the other direction |
