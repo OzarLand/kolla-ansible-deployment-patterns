@@ -14,6 +14,7 @@ environment:
 risk: destructive
 confirmed_by:
   - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, all-in-one", date: 2026-10-24, note: "LVM part only: deployed with the snippet, corrected; Ceph and NFS not run" }
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: kolla-ansible all-in-one, date: 2026-10-27, note: "read-only steps only, LVM column: globals, deployed containers, volume service list, pool capabilities (iSCSI, thin, ratio 20), Glance file volume, 2026.1 inventory groups checked; not run: pvcreate/vgcreate and deploy, cinder-backup removal, the Ceph RBD and NFS columns" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/storage/cinder-guide.html
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/storage/external-ceph-guide.html
@@ -21,7 +22,7 @@ upstream_refs:
   - https://docs.openstack.org/cinder/2026.1/reference/support-matrix.html
   - https://docs.ceph.com/en/latest/rbd/rbd-openstack/
 authored_by: agent:ozarland-author
-last_verified: 2026-10-24
+last_verified: 2026-10-27
 ---
 
 # Cinder and Glance back-ends compared. LVM, Ceph RBD and NFS, and what each choice implies

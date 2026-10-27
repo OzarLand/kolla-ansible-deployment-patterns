@@ -12,7 +12,8 @@ environment:
   storage: local instance store, ceph-rbd (external), cinder volumes
   os: any supported by Kolla-Ansible 2026.1
 risk: read-only
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: kolla-ansible all-in-one, date: 2026-10-27, note: "read-only steps only: local instance store location (nova_compute Docker volume) and qcow2-on-_base format, a boot-from-volume root disk on Cinder LVM/iSCSI; not run: Nova on Ceph RBD and its settings, migration and evacuation" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/storage/external-ceph-guide.html
   - https://docs.openstack.org/nova/2026.1/admin/configuration/hypervisor-kvm.html
@@ -20,7 +21,7 @@ upstream_refs:
   - https://docs.openstack.org/nova/2026.1/admin/evacuate.html
   - https://docs.ceph.com/en/latest/rbd/rbd-openstack/
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # Where instance disks live. Local on each compute, in Ceph RBD, or boot from volume
