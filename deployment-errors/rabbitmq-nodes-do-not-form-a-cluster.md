@@ -140,9 +140,22 @@ gives the container its own copy of the host's `/etc/hosts`). Check inside it to
 sudo docker exec rabbitmq getent ahostsv4 <short-name>
 ```
 
-If it still sees the old entry, the container must be recreated; the deploy does it when its configuration changed,
-otherwise remove it so that the deploy creates it again (state-changing: a RabbitMQ node restart, see the restart
-warning in *For cause 4*). Then run `kolla-ansible prechecks`, and the deploy again.
+If it still sees the old entry, the container must be recreated. The deploy does it when its configuration changed;
+otherwise remove it and let the deploy create it again, one RabbitMQ host at a time.
+
+> ⚠️ **State-changing.** Removes the `rabbitmq` container of this host and recreates it: this node leaves the cluster
+> until it is back, and the services connected to it reconnect to the other nodes. Its data stays in the `rabbitmq`
+> volume. Precondition: the other nodes form a healthy cluster (`cluster_status` on them lists each other as
+> running); one host at a time. Undo: the deploy below recreates it from the same volume.
+
+```bash
+# on this host
+sudo docker rm -f rabbitmq
+# from the deploy host
+kolla-ansible deploy -i <inventory> --tags rabbitmq --limit <host>
+```
+
+Then run `kolla-ansible prechecks`, and the deploy again.
 
 ### For cause 2
 
@@ -169,6 +182,7 @@ member.
 ```bash
 # on the node with the stale state only
 sudo docker exec rabbitmq rabbitmqctl export_definitions /tmp/definitions-before-reset.json   # read-only for the cluster
+sudo docker cp rabbitmq:/tmp/definitions-before-reset.json .                                # keep the copy on the host
 sudo docker exec rabbitmq rabbitmqctl stop_app
 sudo docker exec rabbitmq bash -c 'rabbitmqctl force_reset || rabbitmqctl reset'
 sudo docker exec rabbitmq rabbitmqctl start_app
