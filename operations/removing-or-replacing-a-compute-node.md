@@ -113,7 +113,7 @@ between the remaining hosts).
 
 > 🛑 **Destructive.** Deletes the host's network agents and its compute service. Deleting the compute service also
 > deletes its compute node record and, in Placement, its resource provider; Nova refuses it while instances are
-> still allocated to that host. Precondition: `openstack server list --all-projects --host <host>` is empty and the
+> on the host or migrations are in progress. Precondition: `openstack server list --all-projects --host <host>` is empty and the
 > host's services are stopped (step 4), otherwise they register again. Cannot be undone: the records come back only
 > by deploying the host again.
 

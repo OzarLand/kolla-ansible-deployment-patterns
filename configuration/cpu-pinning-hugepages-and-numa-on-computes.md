@@ -119,7 +119,8 @@ enabled_filters = ComputeFilter,ComputeCapabilitiesFilter,ImagePropertiesFilter,
 The first five are Nova's 2026.1 default; writing the option replaces the whole list, so keep them, and add any other
 filter you rely on (for example `PciPassthroughFilter` with PCI passthrough or SR-IOV, `AggregateInstanceExtraSpecsFilter`
 for aggregates matched by extra specs). With `enable_blazar`, Kolla-Ansible's own list adds `BlazarFilter`; this
-override would drop it, so add it back.
+override would drop it, so add `BlazarFilter` to the end of the `enabled_filters` line above. Do not copy Kolla-Ansible's
+`available_filters` lines into the override: Kolla-Ansible still writes them, as the override does not set them.
 
 For the computes, the Nova guide's example for a host with 24 cores and hyper-threading (48 logical CPUs): one core
 and its sibling for the host, 8 cores and their siblings for pinned instances, the rest shared:
@@ -142,6 +143,10 @@ nova_cpu_dedicated_set: "2-17"
 nova_cpu_shared_set: "18-47"
 nova_reserved_host_memory_mb: 8192
 ```
+
+`reserved_host_memory_mb` is inside the guard on purpose: the computes outside `compute-pinned` keep Nova's default of
+512 MB. To reserve a different amount on every compute, put that line before the `{% if %}`, in its own `[DEFAULT]`
+section, with a variable defined for all computes.
 
 Every compute gets this file. The `{% if %}` wrapper leaves it empty on the computes outside `compute-pinned`, where
 the variables are undefined; without it the template fails there. Do not give the variables empty defaults instead:
