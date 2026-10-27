@@ -12,14 +12,15 @@ environment:
   storage: any
   os: any host OS supported by Kolla-Ansible 2026.1
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0 all-in-one (4 vCPUs, 1 NUMA node, no SMT), ML2/OVS", date: 2026-10-27, note: "huge pages at boot, the inventory group and both overrides, genconfig, reconfigure --tags nova and one instance per flavor (pinned, huge pages, hw:numa_nodes=1) checked with Placement and virsh; the scheduler was unavailable for 2 min 44 s after the reconfigure; several NUMA nodes, SMT siblings, an unpinned compute, the failure symptoms and the undo not run" }
 upstream_refs:
   - https://docs.openstack.org/nova/2026.1/admin/cpu-topologies.html
   - https://docs.openstack.org/nova/2026.1/admin/huge-pages.html
   - https://docs.openstack.org/nova/2026.1/admin/scheduling.html
   - https://docs.openstack.org/kolla-ansible/2026.1/admin/advanced-configuration.html
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # CPU pinning, huge pages and NUMA on Kolla-Ansible computes. Host preparation, nova.conf overrides and the scheduler filter Kolla-Ansible does not enable
@@ -182,8 +183,11 @@ sudo grep -A3 "^\[compute\]" /etc/kolla/nova-compute/nova.conf     # on compute-
 applies and restarts.
 
 > ⚠️ **State-changing.** Restarts `nova_compute` on the hosts in the limit and `nova_scheduler` on the controllers.
-> Running instances keep running; API calls that need the scheduler fail or wait during the restart, which takes
-> seconds. Change the CPU sets on a host with no instances: instances already placed keep the CPUs they had, and a
+> Running instances keep running; API calls that need the scheduler fail or wait during the restart. On the lab
+> this lasted minutes, not seconds: after the restart handler, the task *Refresh cell cache in nova scheduler* sends
+> `nova_scheduler` a reload, its workers stopped gracefully and the new ones started only 2 min 44 s later; instances
+> created in that window went to `ERROR` with `MessagingTimeout`. Wait for `Starting scheduler node` in
+> `nova-scheduler.log` before creating instances. Change the CPU sets on a host with no instances: instances already placed keep the CPUs they had, and a
 > new layout that no longer covers them was not tested here. Undo: remove the overrides and reconfigure again.
 
 ```bash
@@ -198,6 +202,18 @@ openstack resource provider inventory list <provider-uuid>     # PCPU total 16 a
 sudo grep -i "dedicated\|shared\|error" /var/log/kolla/nova/nova-compute.log | tail -20   # on compute-07
 ```
 
+On a 4-CPU lab compute with `cpu_dedicated_set = 2-3`, `cpu_shared_set = 1` and `reserved_host_memory_mb = 1024`,
+the inventory went from `VCPU 4` to (resource class, allocation ratio, reserved, total):
+
+```text
+VCPU 4.0 0 1
+MEMORY_MB 1.0 1024 15992
+DISK_GB 1.0 0 47
+PCPU 1.0 0 2
+```
+
+The `grep` showed no line about the sets after the restart: a quiet log there is normal, errors are what to look for.
+
 Then boot one instance with each flavor and check on the compute where it landed:
 
 ```bash
@@ -205,6 +221,19 @@ sudo docker exec nova_libvirt virsh list                       # or: sudo podman
 sudo docker exec nova_libvirt virsh vcpupin <domain>           # each vCPU on one host CPU from cpu_dedicated_set
 sudo docker exec nova_libvirt virsh dumpxml <domain> | grep -A3 -E "hugepages|numatune"
 ```
+
+On the lab, the `hw:cpu_policy=dedicated` instance had its vCPU, emulator and I/O thread on host CPU 2 (from
+`cpu_dedicated_set`); the `hw:mem_page_size=large` and `hw:numa_nodes=1` instances were pinned to CPU 1, the
+`cpu_shared_set`, and all three had `<numatune>` with `mode='strict'`; the huge-page one also had:
+
+```text
+    <hugepages>
+      <page size='2048' unit='KiB' nodeset='0'/>
+    </hugepages>
+```
+
+`HugePages_Free` drops as the guest touches its memory: 83 of the 128 pages of a 256 MB instance were in use a minute
+after it booted.
 
 ## Where to look when it fails
 
@@ -227,7 +256,8 @@ sudo docker exec nova_libvirt virsh dumpxml <domain> | grep -A3 -E "hugepages|nu
 
 ## What went wrong during deployment
 
-Nothing observed yet: written from the Nova and Kolla-Ansible documentation and the 2026.1 roles.
+On an all-in-one lab: instances created right after the `reconfigure` failed with `MessagingTimeout` while the
+scheduler's workers restarted (see *Applying it*); created again 3 minutes later, they booted.
 
 ## Version notes
 
@@ -251,7 +281,13 @@ No first-hand lessons yet. What the sources make clear:
 
 Written from Nova 2026.1 (CPU topologies, huge pages, scheduling guides, `nova/conf/scheduler.py` and
 `nova/conf/compute.py`) and Kolla-Ansible 2026.1 (advanced configuration guide, the `nova` and `nova-cell` roles).
-Not run on a lab: no output on this page was observed. Not covered: CPU power management for dedicated cores,
+Lab run (Kolla-Ansible 22.2.0, all-in-one VM with 4 vCPUs, one NUMA node, no hyper-threading, nested KVM): huge
+pages at boot (512 pages of 2 MB, reboot), the read-only host checks, the inventory group with `group_vars`
+next to the inventory file, both overrides as written, `genconfig` (no container restarted), `reconfigure --tags
+nova --limit control,compute-pinned`, the Placement and `virsh` checks with one instance per flavor. Not run:
+several NUMA nodes or sibling threads (the lab has neither, so NUMA fitting and `hw:cpu_thread_policy` were not
+exercised), a compute outside `compute-pinned` (the empty-file path of the `{% if %}`), the symptoms of the
+*Where to look* table (no instance was booted without `NUMATopologyFilter`), Blazar, and the undo. Not covered: CPU power management for dedicated cores,
 `mixed` CPU policy in detail, real-time instances (`hw:cpu_realtime`), kernel CPU isolation outside Nova, DPDK with
 OVS (it needs huge pages too: see the Kolla-Ansible DPDK guide), and changing the CPU sets of a host that already runs
 pinned instances.

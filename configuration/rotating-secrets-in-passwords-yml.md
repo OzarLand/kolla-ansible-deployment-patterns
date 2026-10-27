@@ -12,12 +12,13 @@ environment:
   storage: any
   os: any supported by Kolla-Ansible 2026.1
 risk: destructive
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: kolla-ansible all-in-one, date: 2026-10-27, note: "partial: glance_keystone_password and cinder_database_password rotated with kolla-genpwd and reconfigure --tags (not the full reconfigure), heat_domain_admin_password manual step, stop flag check; not run: horizon, grafana, database_password and nova_database_password steps, the RabbitMQ stop/rebuild/deploy and the Memcached flush" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/admin/password-rotation.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # Rotating the secrets in passwords.yml. Which ones a reconfigure applies, which need manual steps, and which need an outage
@@ -141,7 +142,22 @@ quit
 
 ## What went wrong during deployment
 
-Nothing recorded: no rotation has been run on the OzarLand labs.
+Nothing went wrong in the partial run below.
+
+On 2026-10-27, on an all-in-one lab (Kolla-Ansible 22.2.0, no HAProxy, Docker):
+
+- `glance_keystone_password` and `cinder_database_password` emptied in `passwords.yml` (a backup copied first),
+  `kolla-genpwd -p /etc/kolla/passwords.yml` filled exactly those two (40-character values; every other line
+  unchanged).
+- `heat_domain_admin_password` emptied and regenerated the same way, then set on the Keystone user with
+  `openstack user set --domain heat_user_domain --password <new> heat_domain_admin`.
+- `kolla-ansible reconfigure -i <inventory> --tags glance,cinder,heat`: 5 min, `failed=0`. Afterwards Glance listed
+  images, a Cinder volume was created and deleted, and a Heat stack reached `CREATE_COMPLETE` (Heat created its stack
+  project in `heat_user_domain`, which uses the domain admin password) and was deleted.
+- `kolla-ansible stop -i <inventory>` without the flag: `kolla-ansible stop: error: the following arguments are
+  required: --yes-i-really-really-mean-it`, nothing stopped.
+- Not run: the other manual steps (`horizon_secret_key`, `grafana_admin_password`, `database_password`,
+  `nova_database_password`), the RabbitMQ rebuild and the Memcached flush.
 
 ## Version notes
 
@@ -159,8 +175,9 @@ No first-hand lessons yet. What the guide stresses:
 
 ## Validity and limits
 
-Written from Kolla-Ansible 2026.1 (password rotation guide, operating guide). Not run on a lab: the group lists, the
-order and the commands are the guide's. The guide covers the most common secrets only, and assumes Docker; it says
+Written from Kolla-Ansible 2026.1 (password rotation guide, operating guide). Partly run on an all-in-one lab: two
+secrets of the first group, the Heat manual step, and the `stop` flag check (*What went wrong during deployment*);
+the other manual steps, the RabbitMQ outage and the Memcached flush are the guide's and were not run. The guide covers the most common secrets only, and assumes Docker; it says
 the same commands work with Podman by replacing `docker` with `podman`.
 
 Not covered: Fernet and credential keys (rotated by Keystone's own mechanism, not by `passwords.yml`), TLS
