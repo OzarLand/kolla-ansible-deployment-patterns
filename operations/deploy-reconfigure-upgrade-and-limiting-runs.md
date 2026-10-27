@@ -67,8 +67,8 @@ From `kolla_ansible/cli/commands.py` and the operating guide, 2026.1:
 | `deploy-containers` | `deploy-containers` | Checks and updates containers without generating configuration | state-changing |
 | `upgrade` | `upgrade` | Runs each role's upgrade tasks: new images, database migrations, rolling restarts where the role supports them | state-changing; see the [upgrade playbook](../version-notes/2025.1-to-2026.1.md) |
 | `post-deploy` | `post-deploy` | Writes `admin-openrc.sh` on the deploy host | state-changing (local file) |
-| `stop` | — | Stops containers; needs `--yes-i-really-really-mean-it` | state-changing, outage |
-| `destroy` | — | Removes containers and volumes; needs `--yes-i-really-really-mean-it` | destructive |
+| `stop` | `stop` | Stops containers; needs `--yes-i-really-really-mean-it` | state-changing, outage |
+| `destroy` | `destroy` | Removes containers and volumes; needs `--yes-i-really-really-mean-it`; `--include-images` and `--include-dev` remove more | destructive |
 
 `deploy` and `reconfigure` restart a container only when something changed. Kolla-Ansible compares each running
 container with what it should be (image, volumes, environment) and runs `kolla_set_configs --check` inside it against
@@ -86,7 +86,7 @@ always runs.
 **`--limit <hosts>`** restricts the hosts. Kolla-Ansible still gathers facts for every host (the `gather-facts` play
 delegates it to the limited hosts), so an unreachable host still fails the run. The operating guide warns: "using
 the ansible `--limit` option is not recommended", because of known bugs with how `register:` interacts with it (bug
-2054348, upgrading parts of Nova). Use it where the upstream documentation does (adding compute nodes, removing
+2054348; upgrading parts of Nova is the guide's example). Use it where the upstream documentation does (adding compute nodes, removing
 hosts, batching `bootstrap-servers`), and test other uses on a lab.
 
 **`-e kolla_serial=<n or %>`** runs each play in batches of hosts (a rolling run); the bootstrap servers guide uses it
@@ -117,12 +117,17 @@ control`) when controllers are added or removed.
    sudo docker exec <container> diff /etc/<service>/<file> /var/lib/kolla/config_files/<file>
    ```
 
+   Inside the container, `/var/lib/kolla/config_files/` is the bind mount of `/etc/kolla/<service>/` on the host, where
+   `genconfig` wrote the new files; `/etc/<service>/` holds the files the service runs with.
+
 4. Apply it:
 
    > ⚠️ **State-changing.** Restarts the containers of that service whose configuration changed, on every host where
    > it runs, all at once (see the `kolla_serial` remark above). API calls to that service fail briefly; for agents of the data
-   > plane (Neutron agents, `nova_compute`, `openvswitch`), say what a restart interrupts before running it. Undo:
-   > revert the change and run the same command.
+   > plane (Neutron agents, `nova_compute`, `openvswitch`), say what a restart interrupts before running it. If the
+   > change touches the service's HAProxy frontends (TLS, ports, external endpoints), `--tags <service>` also restarts
+   > the `haproxy` containers, backups first, then the host holding the VIP: every API behind the VIPs is briefly
+   > interrupted. Undo: revert the change and run the same command.
 
    ```bash
    kolla-ansible reconfigure -i <inventory> --tags <service>
