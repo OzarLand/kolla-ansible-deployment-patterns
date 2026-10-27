@@ -6,3 +6,4 @@ procedure, written with `templates/deployment-pattern.md`.
 
 - [Adding a compute node to a running deployment](adding-a-compute-node.md)
 - [deploy, reconfigure, upgrade and the others: which command to run, and --limit and --tags](deploy-reconfigure-upgrade-and-limiting-runs.md)
+- [Removing or replacing a compute node](removing-or-replacing-a-compute-node.md)

@@ -81,7 +81,8 @@ networks for another reason), and the network nodes need one on the tunnel netwo
 
 For the agents to fail over, ML2/OVS needs `enable_neutron_agent_ha: true` (L3 HA routers and several DHCP agents
 per network) and at least two hosts in `network`. With ML2/OVN, every host of `network` is a gateway chassis and OVN
-schedules router gateways across them by priority.
+schedules router gateways across them by priority (and by availability zone when `neutron_ovn_availability_zones`
+is set, not covered here).
 
 ## What each layout protects against, and what it does not
 
@@ -94,9 +95,11 @@ schedules router gateways across them by priority.
 | Kernel or OVS problem on a gateway host | Can take a controller down with it | Stays on a network node |
 
 Neither layout makes east-west traffic between instances leave the computes: with VXLAN or Geneve it goes compute to
-compute. And neither replaces distributed routing: with DVR (ML2/OVS) or `neutron_ovn_distributed_fip` (ML2/OVN),
-floating IP traffic of instances leaves from their own compute; only SNAT for instances without a floating IP still
-goes through the network group.
+compute. And neither replaces distributed routing: with DVR in `dvr` mode on the computes
+(`neutron_compute_dvr_mode: dvr`, ML2/OVS) or `neutron_ovn_distributed_fip` (ML2/OVN), floating IP traffic of
+instances leaves from their own compute; only SNAT for instances without a floating IP still goes through the
+network group. With `neutron_compute_dvr_mode: dvr_no_external`, floating IP traffic stays centralised on the
+network group too.
 
 ## What it costs to run
 
@@ -105,7 +108,8 @@ goes through the network group.
 - **Cabling and VLANs.** External and provider networks reach only the network nodes (and the computes if
   distributed), not the controllers: a smaller exposure of the control plane to outside networks.
 - **Upgrades.** More hosts to upgrade, but control plane restarts and data plane restarts can be sequenced
-  separately. The operating guide warns that `--limit` has known issues in general, so test such a sequence on a lab.
+  separately. The operating guide says that using `--limit` "is not recommended", because of known bugs (bug
+  2054348), so test such a sequence on a lab.
 - **Moving later.** Moving from one layout to the other on a running platform means adding the new hosts to
   `network`, moving routers and DHCP networks to them (ML2/OVS) or letting OVN reschedule gateways, then removing the
   old ones from the group: the procedure the upstream *Adding and removing hosts* guide gives for controllers, applied
