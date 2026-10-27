@@ -108,6 +108,7 @@ wrong, version notes, lessons learned, validity and limits.
 | [ML2/OVS versus ML2/OVN with Kolla-Ansible. What changes in globals.yml, in operations and at upgrade time](comparisons/ml2-ovs-versus-ml2-ovn-with-kolla-ansible.md) | 2026.1 | draft |
 | [Single control node versus three controllers. What high availability really costs in Kolla-Ansible](comparisons/single-control-node-versus-three-controllers.md) | 2026.1 | draft |
 | [Separate network nodes versus network services on the controllers. What the network group decides in Kolla-Ansible](comparisons/separate-network-nodes-versus-network-services-on-controllers.md) | 2026.1 | draft |
+| [Docker versus Podman as the container engine of a Kolla-Ansible deployment. What changes for operators, and what migrating costs](comparisons/docker-versus-podman-with-kolla-ansible.md) | 2026.1 | draft |
 
 | Version notes | Releases | Status |
 |---|---|---|
