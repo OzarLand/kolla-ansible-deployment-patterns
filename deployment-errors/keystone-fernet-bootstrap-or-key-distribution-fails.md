@@ -92,14 +92,21 @@ How Kolla-Ansible 2026.1 handles Fernet keys, from the `keystone` role:
   own words, bootstrapping keys on an existing cluster "would overwrite existing keys, and invalidate tokens created
   from them".
 - **Distribution:** the role waits for the `keystone_ssh` port on each host (10 tries, 5 seconds apart), then runs
-  `fernet-push.sh` in `keystone_fernet` on one host: an `rsync --delete` of `/etc/keystone/fernet-keys/` over SSH to
-  every other Keystone host, as user `keystone`, on `keystone_ssh_port`, with the key pair `keystone_ssh_key` from
-  `passwords.yml`.
+  `fernet-push.sh` once, in `keystone_fernet`, on **the first Keystone host in inventory order whose
+  `keystone_fernet` container was running** when the role checked (`keystone_fernet_running_True`), or the first
+  Keystone host if none was. The script does an `rsync --delete` of `/etc/keystone/fernet-keys/` over SSH to every
+  other Keystone host, as user `keystone`, on `keystone_ssh_port`, with the key pair `keystone_ssh_key` from
+  `passwords.yml`. The source is chosen by its running container, not by whether it holds keys: **if that host's key
+  directory is empty, the push empties every other host's**. The keys live in the `keystone_fernet_tokens` volume,
+  shared by the `keystone` and `keystone_fernet` containers.
 - **Start-up:** the `keystone` container waits up to 3 minutes for key `0` before starting its API, then fails.
-- **Health:** `keystone_fernet`'s health check requires key `0` owned by `keystone:keystone` and a successful dry-run
-  `rsync` to every other host.
+- **Health:** the Docker health check of every `keystone_fernet` container requires key `0` owned by
+  `keystone:keystone` and a successful dry-run `rsync` to every other host, so an `unhealthy` `keystone_fernet` in
+  `docker ps` is the quickest pointer to cause 2 or 3.
 - **Rotation** later runs from cron inside `keystone_fernet`, every `fernet_key_rotation_interval` seconds (by
-  default `fernet_token_expiry` plus the allowed expired window).
+  default `fernet_token_expiry` plus the allowed expired window); `fernet-rotate.sh` ends with the same
+  `fernet-push.sh`, so a host with an empty key directory and a running `keystone_fernet` can also empty the others
+  at its next rotation.
 
 ## Possible causes
 
@@ -117,8 +124,8 @@ between hosts (different `passwords.yml` used for different runs). Tell it apart
 
 ### Cause 3: key 0 is missing or has the wrong owner on a host
 
-The `keystone_fernet` volume of a host was removed or emptied (a reinstalled controller), and distribution has not
-reached it yet. Tell it apart: `ls -l /etc/keystone/fernet-keys/` on that host is empty or not owned by
+The `keystone_fernet_tokens` volume of a host was removed or emptied (a reinstalled controller), and distribution
+has not reached it yet. Tell it apart: `ls -l /etc/keystone/fernet-keys/` on that host is empty or not owned by
 `keystone:keystone`; the `keystone` container logs the waiting messages above.
 
 ## Resolution
@@ -127,19 +134,27 @@ reached it yet. Tell it apart: `ls -l /etc/keystone/fernet-keys/` on that host i
 
 Run the command on every Keystone host, without `--limit` and without `kolla_serial`, so that the role can decide
 safely. If every `keystone_fernet` was only stopped and the keys still exist in their volumes, start the containers
-first, so that the role sees them running and does not bootstrap.
-
-> ⚠️ **State-changing.** Starts the stopped `keystone_fernet` containers on each Keystone host; nothing else.
-> Undo: `docker stop keystone_fernet`.
+first, so that the role sees them running and does not bootstrap. Check each host's keys first (read-only; the
+container is stopped, so look at the volume):
 
 ```bash
-# on each Keystone host, if the container exists but is stopped
+sudo ls -l /var/lib/docker/volumes/keystone_fernet_tokens/_data/    # expected: files 0, 1, ... owned by the keystone user
+```
+
+> ⚠️ **State-changing.** Starts the stopped `keystone_fernet` container of a host; nothing else. Start it **only on
+> hosts whose key directory is not empty**: the first running one becomes the source of the next push, which deletes
+> on the other hosts whatever it does not have. Undo: `docker stop keystone_fernet`.
+
+```bash
+# on each Keystone host whose key directory holds keys, if the container exists but is stopped
 sudo docker start keystone_fernet
 ```
 
 > ⚠️ **State-changing.** A full run of the keystone role on every host. If no `keystone_fernet` runs anywhere, it
-> bootstraps new keys: every existing token becomes invalid and users must authenticate again. Undo: none for the
-> invalidated tokens.
+> runs `fernet_setup` on the first Keystone host: on an empty key repository this creates new keys, every existing
+> token becomes invalid and users must authenticate again (whether `fernet_setup` replaces keys already present was
+> not checked for this page). If the push source has an empty key directory, the keys of every other host are
+> deleted and every Keystone API fails. Undo: none for the invalidated tokens or the deleted keys.
 
 ```bash
 kolla-ansible deploy -i <inventory> --tags keystone
@@ -153,9 +168,29 @@ redistributes the keys.
 
 ### For cause 3
 
-Let the role redistribute the keys from a healthy host: run `kolla-ansible deploy -i <inventory> --tags keystone`
-on every host (the same ⚠️ as above). Do not copy keys by hand between hosts, and never run `fernet_setup` yourself
-on one host of a running cluster: that host's keys would no longer match the others'.
+Make sure the push will come from a host that has the keys, then let the role redistribute them.
+
+1. On the host with the missing keys, read-only: `sudo docker exec keystone_fernet ls -l /etc/keystone/fernet-keys/`
+   (or the volume path above if the container is stopped). If the directory is empty and that host's
+   `keystone_fernet` is running, stop it, so that it cannot be the push source, neither in the deploy nor at its next
+   cron rotation:
+
+   > ⚠️ **State-changing.** Stops `keystone_fernet` on the host with no keys: its rotation and pushes stop; its
+   > `keystone` API was already failing without keys. The deploy below starts it again. Undo: `docker start
+   > keystone_fernet`.
+
+   ```bash
+   sudo docker stop keystone_fernet
+   ```
+
+2. Check that at least one other Keystone host has a running `keystone_fernet` and a full key directory (the
+   `sha256sum` command of the quick checks).
+3. Run the keystone role on every host: `kolla-ansible deploy -i <inventory> --tags keystone` (the same ⚠️ as
+   above). The push now comes from the first host, in inventory order, whose `keystone_fernet` was running.
+4. Compare the key hashes on every host (*Verification*).
+
+Do not copy keys by hand between hosts, and never run `fernet_setup` yourself on one host of a running cluster: that
+host's keys would no longer match the others'.
 
 ## Verification
 
