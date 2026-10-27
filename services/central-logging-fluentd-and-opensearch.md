@@ -183,25 +183,36 @@ sudo tail -20 /var/log/kolla/fluentd/fluentd.log                # on any host: n
 `enable_central_logging: "no"` does not remove what was deployed:
 
 - `enable_opensearch` stays true when `enable_osprofiler` is set, or when CloudKitty stores its data in OpenSearch
-  (`ansible/group_vars/all/opensearch.yml`): OpenSearch is then still wanted, and only Fluentd's shipping stops.
+  (`ansible/group_vars/all/opensearch.yml`). OpenSearch is then still wanted, and **Fluentd keeps shipping every log
+  to it**: in 2026.1 the Fluentd role enables its OpenSearch output whenever `enable_opensearch` is true (or an
+  external `opensearch_address` is set), not on `enable_central_logging`. The disk and retention load stay.
 - The containers and the `opensearch` volume stay on the hosts.
-- The HAProxy fragments for OpenSearch and Dashboards stay under `/etc/kolla/haproxy/services.d/` on each load balancer
-  host: the `haproxy-config` role writes fragments for enabled services and never deletes one. The Dashboards
-  frontend stays on the external VIP, with dead back-ends.
+- The HAProxy fragments for OpenSearch and Dashboards, `opensearch.cfg` and `opensearch-dashboards.cfg`, stay under
+  `/etc/kolla/haproxy/services.d/` on each load balancer host (and their entries in `external-frontend-map` with
+  `haproxy_single_external_frontend`): the `haproxy-config` role writes fragments for enabled services and never
+  deletes one. The Dashboards frontend stays on the external VIP, with dead back-ends.
+- Deleting a fragment by hand is not enough either: a `reconfigure --tags loadbalancer` sees no change, because the
+  restart decision compares only the files that exist in the configuration directory, so HAProxy keeps serving the
+  removed frontends until it restarts.
 
-> ⚠️ **State-changing.** Removes the logging containers and their HAProxy frontends. The `reconfigure` restarts the
-> `haproxy` containers, with the same brief interruption of every API as above. Precondition: `enable_central_logging`
-> is already `"no"` and nothing else needs OpenSearch. Logs stored in OpenSearch stay in the `opensearch` volume until
-> you remove it, which deletes them.
+The full undo, only when `enable_opensearch` itself has become false:
+
+> ⚠️ **State-changing.** Stops Fluentd's shipping, removes the logging containers, and restarts the `haproxy`
+> container on every load balancer host to drop the frontends: every API behind the VIPs is briefly interrupted on
+> each restart, and if the VIP holder restarts first, the VIP moves. Restart the backup hosts first, the VIP holder
+> last, one at a time, in a window. Precondition: `enable_central_logging` is `"no"` and nothing else needs OpenSearch
+> (`enable_opensearch` false). Logs stored in OpenSearch stay in the `opensearch` volume until you remove it, which
+> deletes them.
 
 ```bash
-kolla-ansible reconfigure -i <inventory> --tags fluentd      # Fluentd stops shipping to OpenSearch
+kolla-ansible reconfigure -i <inventory> --tags fluentd      # Fluentd's OpenSearch output goes away
 # on each opensearch host
 sudo docker rm -f opensearch opensearch_dashboards           # or: sudo podman rm -f ...
-# on each load balancer host: the fragments of OpenSearch and Dashboards
-ls /etc/kolla/haproxy/services.d/
-sudo rm /etc/kolla/haproxy/services.d/<opensearch-fragment>.cfg
-kolla-ansible reconfigure -i <inventory> --tags loadbalancer
+# on each load balancer host
+sudo rm /etc/kolla/haproxy/services.d/opensearch.cfg /etc/kolla/haproxy/services.d/opensearch-dashboards.cfg
+ip -br addr | grep -w "<internal-vip>"                        # prints a line only on the VIP holder
+sudo docker restart haproxy                                  # backups first, the VIP holder last
+sudo docker exec haproxy ls /etc/haproxy/services.d/         # the two fragments are gone inside the container
 ```
 
 ## Where to look when it fails
