@@ -306,7 +306,11 @@ pushes includes `heartbeat_key` (`octavia/amphorae/backends/agent/agent_jinja_cf
 > ⚠️ **State-changing.** Rewrites the agent configuration inside one running amphora. Amphorae built from an image
 > whose agent does not support it log an error on the controller and are not changed (release note). Not tested
 > here, including the order to follow: controllers first then amphorae, or the reverse, and what the health managers
-> accept in between. Try it on a lab first.
+> accept in between. Try it on a lab first. An earlier version of this API updated only the agent configuration, not
+> the running health sender (release note *Fix-Amphora-Config-Update*): with an older amphora image, do not assume the
+> new key reached the heartbeats. Undo: put the previous key back in the override, run `reconfigure --tags octavia`
+> and `amphora configure` again, or fail the amphora over (`openstack loadbalancer amphora failover <amphora-id>`) so
+> that it is rebuilt with the controllers' current configuration.
 
 ```bash
 openstack loadbalancer amphora configure <amphora-id>
