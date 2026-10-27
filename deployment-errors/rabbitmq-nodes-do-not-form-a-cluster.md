@@ -92,10 +92,11 @@ connections, a cookie or authentication refusal, or an inconsistent cluster.
 
 ### Cause 1: the short host names do not resolve to the API addresses
 
-The host's own name resolves first to another address (for example a loopback line other than `localhost` that some distributions add to
-`/etc/hosts`, or a management address from DNS), or a controller's name does not resolve on the others. The precheck
-catches it when it runs. Tell it apart: `getent ahostsv4 <short-name>` on each host does not return exactly that
-host's `api_interface` address.
+The host's own name resolves first to another address (for example a loopback line other than `localhost` that
+some distributions add to `/etc/hosts`, or a management address from DNS), or a controller's name does not resolve on
+the others. The precheck catches it when it runs. Tell it apart: `getent ahostsv4 <short-name>` (`ahostsv6` when
+`api_address_family` is `ipv6`, as the precheck does) on each host does not return exactly that host's
+`api_interface` address.
 
 ### Cause 2: the Erlang ports are closed between the controllers
 
@@ -132,7 +133,16 @@ sudoedit /etc/hosts
 getent ahostsv4 "$(hostname -s)"      # expected: only the api_interface address
 ```
 
-Then run `kolla-ansible prechecks`, and the deploy again.
+A running `rabbitmq` container may keep the resolution it had when it was created (with host networking, Docker
+gives the container its own copy of the host's `/etc/hosts`). Check inside it too:
+
+```bash
+sudo docker exec rabbitmq getent ahostsv4 <short-name>
+```
+
+If it still sees the old entry, the container must be recreated; the deploy does it when its configuration changed,
+otherwise remove it so that the deploy creates it again (state-changing: a RabbitMQ node restart, see the restart
+warning in *For cause 4*). Then run `kolla-ansible prechecks`, and the deploy again.
 
 ### For cause 2
 
@@ -153,18 +163,25 @@ member.
 > 🛑 **Destructive.** Removes this node's RabbitMQ data: its queues and the messages in them, its view of the cluster.
 > On a running platform, messages queued only on that node are lost and the services' RPC calls through it fail
 > until it rejoins. Precondition: the other nodes form a healthy cluster (`cluster_status` on them lists each other
-> as running), and you are on the node with the stale state. Cannot be undone.
+> as running), and you are on the node with the stale state. Cannot be undone. Copy to take first: the definitions
+> (users, vhosts, policies), with `rabbitmqctl export_definitions`; messages in flight cannot be saved.
 
 ```bash
 # on the node with the stale state only
+sudo docker exec rabbitmq rabbitmqctl export_definitions /tmp/definitions-before-reset.json   # read-only for the cluster
 sudo docker exec rabbitmq rabbitmqctl stop_app
-sudo docker exec rabbitmq rabbitmqctl reset
+sudo docker exec rabbitmq bash -c 'rabbitmqctl force_reset || rabbitmqctl reset'
 sudo docker exec rabbitmq rabbitmqctl start_app
 sudo docker exec rabbitmq rabbitmqctl await_online_nodes <number of rabbitmq hosts>
 ```
 
-If a controller was renamed or replaced, the healthy nodes may still list its old name as a stopped member. Remove
-it from one healthy node:
+`force_reset` first, then `reset`: this is the order Kolla-Ansible's own `reset-state.yml` uses. A plain `reset` can
+refuse on a node whose stored membership names peers it cannot reach; `force_reset` does not exist with Khepri, the
+default metadata store from RabbitMQ 4.2 (release note of bug 2150536), hence the fallback.
+
+If a controller was renamed or replaced under a new name, the healthy nodes may still list its old name as a
+stopped member. Remove it from one healthy node, while the old name is listed as stopped. (If the replacement host
+reuses the old name, do not forget it: reset that node as above instead.)
 
 > 🛑 **Destructive.** Removes the old member from the cluster's membership; any queue whose only replica was on it is
 > lost. Precondition: the old node is gone for good (reinstalled or renamed) and is not running. Cannot be undone; the
