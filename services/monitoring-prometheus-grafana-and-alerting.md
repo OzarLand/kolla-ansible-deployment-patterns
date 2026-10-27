@@ -202,22 +202,29 @@ kolla-ansible deploy -i <inventory> --tags common,loadbalancer,prometheus,grafan
 
 **Undoing it.** Setting `enable_prometheus` and `enable_grafana` back to `"no"` removes neither the containers nor
 the HAProxy frontends. In 2026.1 the `haproxy-config` role writes `/etc/kolla/haproxy/services.d/<service>.cfg` only
-for enabled services and never deletes one, so the Grafana, Prometheus and Alertmanager frontends stay in HAProxy,
-with dead back-ends, on the external VIP too for Grafana and Alertmanager.
+for enabled services and never deletes one, so `prometheus-server.cfg`, `prometheus-alertmanager.cfg` and
+`grafana.cfg` stay, and HAProxy keeps their frontends with dead back-ends, on the external VIP too for Grafana and
+Alertmanager (and in `external-frontend-map` with `haproxy_single_external_frontend`). Deleting a fragment by hand is
+not enough either: a `reconfigure --tags loadbalancer` sees no change, because the restart decision compares only the
+files that exist in the configuration directory. HAProxy drops the frontends only when its container restarts, which
+copies the directory afresh.
 
-> ⚠️ **State-changing.** Removes the monitoring containers and their frontends. The `reconfigure` restarts the
-> `haproxy` containers as described above, with the same brief interruption of every API. Precondition: the
-> variables are already `"no"`, so that the reconfigure does not write the fragments again. The Prometheus volume
-> stays on disk until you remove it.
+> ⚠️ **State-changing.** Removes the monitoring containers, then restarts the `haproxy` container on every load
+> balancer host to drop the frontends: every API behind the VIPs is briefly interrupted on each restart, and if the
+> VIP holder restarts first, the VIP moves. Restart the backup hosts first, the VIP holder last, one at a time, in a
+> window. Precondition: the variables are already `"no"`, so that no later run writes the fragments again. The
+> Prometheus volume stays on disk until you remove it.
 
 ```bash
 # on each host running them: the containers of the Topology table that exist there
 sudo docker rm -f prometheus_server prometheus_alertmanager grafana     # or: sudo podman rm -f ...
-# on each load balancer host: the fragments of the disabled services
-ls /etc/kolla/haproxy/services.d/
-sudo rm /etc/kolla/haproxy/services.d/<fragment-of-a-disabled-service>.cfg
-# from the deployment host
-kolla-ansible reconfigure -i <inventory> --tags loadbalancer
+# on each load balancer host
+sudo rm /etc/kolla/haproxy/services.d/prometheus-server.cfg \
+        /etc/kolla/haproxy/services.d/prometheus-alertmanager.cfg \
+        /etc/kolla/haproxy/services.d/grafana.cfg
+ip -br addr | grep -w "<internal-vip>"                        # prints a line only on the VIP holder
+sudo docker restart haproxy                                  # backups first, the VIP holder last
+sudo docker exec haproxy ls /etc/haproxy/services.d/         # the three fragments are gone inside the container
 ```
 
 RabbitMQ metrics need one more step: the `rabbitmq` role writes the plugin into RabbitMQ's configuration, so the
