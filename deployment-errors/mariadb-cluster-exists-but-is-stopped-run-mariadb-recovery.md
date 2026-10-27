@@ -1,7 +1,7 @@
 ---
 title: kolla-ansible fails with "MariaDB cluster exists but is stopped". Recovering a fully stopped Galera cluster with kolla-ansible mariadb-recovery
 kind: runbook
-status: draft
+status: lab-verified
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, mariadb, docker]
 deployment_methods: [kolla-ansible]
@@ -11,7 +11,8 @@ environment:
   storage: any
   os: any host OS supported by the Kolla-Ansible release
 risk: destructive
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, 3 controllers (Galera behind ProxySQL) + 2 computes, Docker", date: 2026-10-27, note: "cause 1 reproduced: the 3 mariadb containers stopped cleanly together (systemctl), reconfigure --tags mariadb failed with the message; quick checks, step 1 (copy; stop with systemctl), mariadb-recovery (2 min 32 s, highest seqno chosen), step 3 (needs sudo and 'Recovered position:') and verification run. Not run: crash with seqno -1, forced bootstrap with mariadb_recover_inventory_name, cause 2" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html
   - https://docs.openstack.org/kolla-ansible/2026.1/admin/mariadb-backup-and-restore.html
@@ -30,10 +31,17 @@ MariaDB does not come back by itself, the OpenStack APIs return errors, and any 
 `reconfigure` or `upgrade` stops in the `mariadb` role with:
 
 ```text
-TASK [mariadb : Fail on existing but stopped cluster] ****
+TASK [mariadb : Fail on existing but stopped cluster] **************************
+[ERROR]: Task failed: Action failed: MariaDB cluster exists but is stopped. Please start it using kolla-ansible mariadb-recovery
+Origin: ~/kolla-venv/share/kolla-ansible/ansible/roles/mariadb/tasks/lookup_cluster.yml:38:7
+...
 fatal: [controller-1]: FAILED! => {"changed": false, "msg": "MariaDB cluster exists but is stopped. Please start it using kolla-ansible mariadb-recovery"}
 ```
 
+Captured on a lab (`kolla-ansible reconfigure --tags mariadb`, Kolla-Ansible 22.2.0), on every MariaDB host. Earlier
+in the same run, one ignored failure per host is expected: `fatal: [controller-1]: FAILED! => {"changed": false,
+"elapsed": 10, "msg": "Timeout when waiting for search string MariaDB in 192.0.2.11:3306"}`. Meanwhile the APIs
+answered `Bad Gateway (HTTP 502)` (`openstack token issue`, `openstack server list`).
 The task name and message are those of `ansible/roles/mariadb/tasks/lookup_cluster.yml` in Kolla-Ansible 2026.1.
 The task fails when the inventory has more than one MariaDB host, every host already has a `mariadb` volume, and
 none answers on the MariaDB port.
@@ -64,6 +72,10 @@ From the deploy host, read-only, for each MariaDB host:
 # 4. Does it answer on the MariaDB port (3306 by default, mariadb_port)?
 nc -zv -w 3 <controller-api-address> 3306
 ```
+
+On a lab where the three containers were stopped within a second (`systemctl stop kolla-mariadb-container.service`),
+check 1 showed `Exited (0)` everywhere and check 2 a `seqno` on every node, with `safe_to_bootstrap: 1` only on the
+node with the highest `seqno` (the last to stop); check 4 answered `Connection refused`.
 
 ## Diagnosis
 
@@ -102,11 +114,15 @@ Please wait for WSREP sync before proceeding.`, not with this message. Look at t
 by a state transfer from it.
 
 > ⚠️ **State-changing.** Stops a `mariadb` container that is still restarting, then copies its data aside; no data is
-> changed. Needs free space equal to the data size on each node. Undo: `docker start mariadb` (the copy can stay).
+> changed. Needs free space equal to the data size on each node. Undo: `sudo systemctl start
+> kolla-mariadb-container.service` (the copy can stay).
+
+On Kolla-Ansible 2026.1 the containers are run by systemd units: stop them with `systemctl`, or the unit starts the
+container again. On the lab, the copy of a 2.3 GB data directory took about 30 s per node.
 
 ```bash
 sudo docker ps -a --filter name=mariadb --format '{{.Names}}\t{{.Status}}'   # read-only
-sudo docker stop mariadb            # only if it shows Restarting or Up
+sudo systemctl stop kolla-mariadb-container.service    # only if it shows Restarting or Up
 sudo cp -a /var/lib/docker/volumes/mariadb/_data /var/lib/mariadb-before-recovery-$(date +%F)
 ```
 
@@ -123,6 +139,9 @@ sudo cp -a /var/lib/docker/volumes/mariadb/_data /var/lib/mariadb-before-recover
 kolla-ansible mariadb-recovery -i <inventory>
 ```
 
+On the lab (3 nodes, 2.3 GB of data, clean stop), the run took 2 min 32 s, chose the node with the highest `seqno`
+and ended with `failed=0`; the APIs answered again without restarting them.
+
 The role waits for the bootstrap node to be `OPERATIONAL`, for each other node to be `Synced` (the others replace
 their data by an incremental or full state transfer), then restarts the bootstrap node normally, so that no node keeps
 the bootstrap setting. The role's waits are about 10 × 6 seconds for a joiner's port and 30 × 10 seconds for
@@ -130,15 +149,26 @@ the bootstrap setting. The role's waits are about 10 × 6 seconds for a joiner's
 `docker logs mariadb` there for the transfer's progress before running anything again.
 
 **3. Check which host was chosen, and why** (read-only). The role writes the chosen host to
-`/tmp/kolla_mariadb_recover_inventory_name_<shard>` on the deploy host (not on a forced run with
+`/tmp/kolla_mariadb_recover_inventory_name_<shard>` on the deploy host (`…_shard_0` on the lab, holding the host name) (not on a forced run with
 `mariadb_recover_inventory_name`, which writes none and removes an old one). On each node, the position the
 comparison used is the last `Recovered position` line of the MariaDB log. Running the same `grep` on each node
 **before** step 2 too (a line from an earlier recovery attempt or a manual `--wsrep-recover`) catches a missing or
 stale position before the bootstrap, when the services are not writing yet:
 
 ```bash
-grep 'Recovered position' /var/log/kolla/mariadb/mariadb.log | tail -n 1
+sudo grep 'Recovered position:' /var/log/kolla/mariadb/mariadb.log | tail -n 1
 ```
+
+Keep the colon: without it, the pattern also matches `WSREP: Recovered position from storage: <uuid>:<seqno>`, which a
+node writes when it joins by state transfer, after the recovery. On the lab, `tail -n 1` without the colon returned
+that line on every node, not the line of the recovery:
+
+```text
+2026-10-27 18:18:00 0 [Note] WSREP: Recovered position: 00000000-0000-4000-8000-000000000001:6589
+2026-10-27 18:19:51 3 [Note] WSREP: Recovered position from storage: 00000000-0000-4000-8000-000000000001:6682
+```
+
+Before step 2, the last line on the lab was from an earlier recovery, about 50 minutes older, as described below.
 
 The comparison has blind spots: a node whose recovery wrote no `Recovered position` line gets an empty `seqno`, is
 skipped by every comparison and can end up chosen itself; and the role reads the whole log, so the last line may come
@@ -168,7 +198,8 @@ space, the log). Do not run `mariadb-recovery` while a node is serving data: it 
 ## Verification
 
 ```bash
-# on each MariaDB host; -p prompts for database_password from passwords.yml (database_user, root by default)
+# on each MariaDB host; -p prompts for database_password from passwords.yml (database_user, root by default);
+# -it needs a terminal (drop it in a script)
 sudo docker exec -it mariadb mariadb -uroot -p -e "SHOW STATUS WHERE Variable_name IN ('wsrep_cluster_size','wsrep_cluster_status','wsrep_local_state_comment');"
 # expected: wsrep_cluster_size = number of MariaDB hosts, Primary, Synced
 
@@ -182,7 +213,10 @@ Then a `kolla-ansible deploy` or `reconfigure` goes past *Fail on existing but s
 
 - Written from Kolla-Ansible 2026.1 code (`ansible/mariadb-recovery.yml`, `ansible/roles/mariadb/tasks/lookup_cluster.yml`
   and `recover_cluster.yml`) and its operating and backup guides, with Galera's crash recovery documentation for the
-  background. Not reproduced on a lab for this page. Status `draft`.
+  background. Cause 1 was reproduced on a lab (Kolla-Ansible 22.2.0, 3 MariaDB hosts with ProxySQL, Docker): the
+  three containers stopped cleanly within a second, then `reconfigure --tags mariadb`, steps 1 to 3 and the
+  verification. Not run on the lab: a crash (`seqno: -1`), the forced bootstrap with
+  `mariadb_recover_inventory_name`, cause 2, a time-out on a joiner. Status `draft`.
 - Docker paths (`/var/lib/docker/volumes/...`); with Podman, check the volume path.
 - Not covered: several shards (the recovery works per shard group), external databases, a cluster split by a network
   partition where some nodes still serve (cause 2), and data corruption, for which the
