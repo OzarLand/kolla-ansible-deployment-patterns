@@ -7,3 +7,4 @@ with `templates/deployment-pattern.md`.
 - [Octavia with the amphora provider: certificates, the management network and the amphora image](octavia-amphora-certificates-and-management-network.md)
 - [Monitoring with Prometheus, Grafana and Alertmanager: what is deployed, and the rules, receivers and dashboards you still have to bring](monitoring-prometheus-grafana-and-alerting.md)
 - [Central logging with Fluentd and OpenSearch: where logs go, how to search them by request ID, and how long they are kept](central-logging-fluentd-and-opensearch.md)
+- [Designate with the BIND9 back-end: name servers, NS records, Neutron DNS integration, and how to check a record end to end](designate-dns-with-bind9-and-neutron.md)
