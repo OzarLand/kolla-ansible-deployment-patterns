@@ -199,10 +199,12 @@ The full undo, only when `enable_opensearch` itself has become false:
 
 > ⚠️ **State-changing.** Stops Fluentd's shipping, removes the logging containers, and restarts the `haproxy`
 > container on every load balancer host to drop the frontends: every API behind the VIPs is briefly interrupted on
-> each restart, and if the VIP holder restarts first, the VIP moves. Restart the backup hosts first, the VIP holder
-> last, one at a time, in a window. Precondition: `enable_central_logging` is `"no"` and nothing else needs OpenSearch
-> (`enable_opensearch` false). Logs stored in OpenSearch stay in the `opensearch` volume until you remove it, which
-> deletes them.
+> each restart, and the VIP may move while the VIP holder restarts, since keepalived tracks the HAProxy process.
+> Restart the backup hosts first, the VIP holder last, one at a time, in a window. Precondition:
+> `enable_central_logging` is `"no"` and nothing else needs OpenSearch (`enable_opensearch` false). Undo: set
+> `enable_central_logging: "yes"` again and run the deploy of *Applying it*, which recreates the containers and
+> fragments. Removing the `opensearch` volume afterwards is the one step that cannot be undone: it deletes the stored
+> logs.
 
 ```bash
 kolla-ansible reconfigure -i <inventory> --tags fluentd      # Fluentd's OpenSearch output goes away
@@ -210,9 +212,9 @@ kolla-ansible reconfigure -i <inventory> --tags fluentd      # Fluentd's OpenSea
 sudo docker rm -f opensearch opensearch_dashboards           # or: sudo podman rm -f ...
 # on each load balancer host
 sudo rm /etc/kolla/haproxy/services.d/opensearch.cfg /etc/kolla/haproxy/services.d/opensearch-dashboards.cfg
-ip -br addr | grep -w "<internal-vip>"                        # prints a line only on the VIP holder
-sudo docker restart haproxy                                  # backups first, the VIP holder last
-sudo docker exec haproxy ls /etc/haproxy/services.d/         # the two fragments are gone inside the container
+ip -br addr | grep -w "<internal-vip>"                        # a line only on the VIP holder; one keepalived holds both VIPs
+sudo docker restart haproxy                                  # or: sudo podman restart haproxy; backups first, VIP holder last
+sudo docker exec haproxy ls /etc/haproxy/services.d/         # or: sudo podman exec ...; the two fragments are gone
 ```
 
 ## Where to look when it fails

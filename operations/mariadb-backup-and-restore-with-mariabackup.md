@@ -188,6 +188,16 @@ not cover this. Emptying the data directory of each other node makes it join as 
 full SST from the cluster. This follows from how Galera works and from the role's code; it has not been observed on a
 lab for this page.
 
+First, on each other MariaDB node (never on the restored one), check that its `mariadb` container is stopped. The
+commands of this page assume Docker; with Podman, use `podman` and the volume path under
+`/var/lib/containers/storage/volumes/`.
+
+```bash
+sudo docker ps -a --filter name=mariadb --format '{{.Names}}\t{{.Status}}'   # read-only: mariadb must show Exited
+```
+
+Go on only if it shows `Exited` on that host: emptying the data directory of a running node corrupts it.
+
 > 🛑 **Destructive.** On every MariaDB node **except** the restored one: deletes the node's database files, so that
 > it copies everything from the restored node when it joins. Its own newer data is lost unless it was copied aside.
 > Precondition: the `mariadb` volume of this node was copied aside (step 3's precondition, done on every node), every
@@ -195,7 +205,7 @@ lab for this page.
 > the volume.
 
 ```bash
-# on each other MariaDB node, never on the restored one
+# on each other MariaDB node, never on the restored one, after the check above showed Exited
 sudo find /var/lib/docker/volumes/mariadb/_data -mindepth 1 -delete
 ```
 
