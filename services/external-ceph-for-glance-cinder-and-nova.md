@@ -12,13 +12,14 @@ environment:
   storage: ceph-rbd (external)
   os: any host OS supported by Kolla-Ansible 2026.1
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: kolla-ansible all-in-one, date: 2026-10-27, note: "read-only steps only, no Ceph: defaults, keyring checks, template rendering and libvirt secret names checked in the installed Kolla-Ansible 22.2.0; virsh secret-list run (empty); not run: rbd ls, prechecks, the reconfigure, the test resources" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/storage/external-ceph-guide.html
   - https://docs.ceph.com/en/latest/rbd/rbd-openstack/
   - https://docs.ceph.com/en/latest/rados/operations/user-management/
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # External Ceph for Glance, Cinder, Cinder backup and Nova. Pools, users, the files Kolla-Ansible expects, and the libvirt secrets
