@@ -125,10 +125,10 @@ control`) when controllers are added or removed.
 
    > ⚠️ **State-changing.** Restarts the containers of that service whose configuration changed, on every host where
    > it runs, all at once (see the `kolla_serial` remark above). API calls to that service fail briefly; for agents of
-   > the data plane (Neutron agents, `nova_compute`, `openvswitch`), say what a restart interrupts before running it. If the
-   > change touches the service's HAProxy frontends (TLS, ports, external endpoints), `--tags <service>` also restarts
-   > the `haproxy` containers, backups first, then the host holding the VIP: every API behind the VIPs is briefly
-   > interrupted. Undo: revert the change and run the same command.
+   > the data plane (Neutron agents, `nova_compute`, `openvswitch`), say what a restart interrupts before running it.
+   > If the change touches the service's HAProxy frontends (TLS, ports, external endpoints), `--tags <service>` also
+   > restarts the `haproxy` containers, backups first, then the host holding the VIP: every API behind the VIPs is
+   > briefly interrupted. Undo: revert the change and run the same command.
 
    ```bash
    kolla-ansible reconfigure -i <inventory> --tags <service>
