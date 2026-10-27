@@ -55,7 +55,8 @@ or VLAN separate from the API network. Computes carry the instances' disk traffi
 ### On the Ceph side
 
 From Ceph's *Block devices and OpenStack* guide, run on a Ceph admin host (the pool names are Kolla-Ansible's
-defaults; size the placement groups or let the autoscaler do it):
+defaults). `ceph osd pool create` without a placement group count relies on the PG autoscaler, on by default in
+current Ceph releases; on an older cluster without it, give the count explicitly:
 
 > ⚠️ **State-changing.** Creates pools and client users in the Ceph cluster. Nothing in OpenStack changes yet. Undo:
 > `ceph auth del client.<name>`; deleting a pool is destructive and needs the cluster's pool deletion setting, so
@@ -163,7 +164,9 @@ kolla-ansible prechecks -i <inventory>
 > on every compute; writes the libvirt secrets. Instances keep running; API calls to Glance, Cinder and Nova may fail
 > while their containers restart. Switching an existing deployment's back-end does not move existing images,
 > volumes or instance disks: they stay where they were, and new ones go to Ceph. Undo: set the switches back and
-> reconfigure; data already written to Ceph stays there.
+> reconfigure. That is a configuration undo only, safe before any resource has been created on Ceph: afterwards,
+> instances, volumes and images stored in Ceph can no longer be opened by the services until the switches are set
+> again.
 
 ```bash
 kolla-ansible reconfigure -i <inventory> --tags glance,cinder,nova
@@ -173,7 +176,8 @@ kolla-ansible reconfigure -i <inventory> --tags glance,cinder,nova
 
 ```bash
 openstack volume service list                    # cinder-volume for rbd-1 and cinder-backup up
-sudo docker exec nova_libvirt virsh secret-list  # on a compute: the ceph-persistent-cinder secret (and ceph-ephemeral-nova)
+sudo docker exec nova_libvirt virsh secret-list  # on a compute: ceph-persistent-cinder with cinder_backend_ceph,
+                                                 # ceph-ephemeral-nova with nova_backend_ceph
 ```
 
 > ⚠️ **State-changing.** Creates and deletes test resources in a test project.
@@ -219,7 +223,8 @@ Nothing observed yet: written from the Kolla-Ansible external Ceph guide, the 20
 ## Version notes
 
 - 2026.1: per-host Ceph clusters for computes (`ceph_cluster` per host, files under `config/nova/<host>/`) and several
-  Ceph back-ends for Glance and Cinder (`glance_ceph_backends`, `cinder_ceph_backends`) are supported; see the guide.
+  Ceph back-ends for Glance and Cinder (`glance_ceph_backends`, `cinder_ceph_backends`) are supported upstream, not
+  covered on this page; see the guide.
 - RadosGW integration (`enable_ceph_rgw`) is a separate topic, not covered here.
 
 ## Lessons learned
