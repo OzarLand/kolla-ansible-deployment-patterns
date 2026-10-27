@@ -55,8 +55,10 @@ everything that was configured with addresses; a new address is fine as long as 
 
 ## Storage design
 
-Nothing to move: the data of the failed controller (Galera, RabbitMQ, Fernet keys) is replicated on the two others
-and is copied to the replacement when it joins.
+Nothing to move: the data of the failed controller (Galera, RabbitMQ, Fernet keys) is replicated on the two others.
+Galera and the Fernet keys are copied to the replacement when it joins. RabbitMQ's existing quorum queues (the
+default in 2026.1) and streams (`om_enable_rabbitmq_stream_fanout`, true by default) are **not**: a node that joins
+the cluster is not added to existing queues, so they stay with two replicas until step 7 grows them.
 
 ## Inventory and configuration layout
 
@@ -95,14 +97,16 @@ openstack router list --agent $l3_id -f value -c ID | while read router; do
   openstack network agent remove router $l3_id $router --l3
   openstack network agent add router $target_l3_id $router --l3
 done
+openstack network agent set $l3_id --disable
 ```
 
-(The guide gives the same loop for DHCP agents with `network list --agent` and `--dhcp`.)
+(The guide gives the same loop for DHCP agents with `network list --agent` and `--dhcp`; disable the dead DHCP agent
+the same way, so that no new router or network is scheduled on it before step 8 deletes it.)
 
 **3. If the failed host is still reachable, stop its services** (the guide's command):
 
 > ⚠️ **State-changing.** Stops every Kolla container on the failed host only. Undo: `kolla-ansible deploy --limit
-> <failed-host>`, if the host is still usable.
+> control`, if the host is still usable (the guide asks for every controller in the limit of a controller deploy).
 
 ```bash
 kolla-ansible stop -i <inventory> --yes-i-really-really-mean-it --limit <failed-host>
@@ -142,9 +146,11 @@ kolla-ansible bootstrap-servers -i <inventory> --limit control
 kolla-ansible pull -i <inventory> --limit <replacement-host>
 ```
 
-> ⚠️ **State-changing.** Deploys the control plane containers on the replacement and reconfigures the cluster members
-> on the healthy controllers: their containers restart where the configuration changed (MariaDB and RabbitMQ one by
-> one, by the roles' handlers), briefly interrupting API calls through the restarted host. The replacement's MariaDB
+> ⚠️ **State-changing.** Deploys the control plane containers on the replacement. With a new name, it also
+> reconfigures the cluster members on the healthy controllers (`wsrep_cluster_address` and the RabbitMQ peer list
+> change): their containers restart where the configuration changed (MariaDB and RabbitMQ one by one, by the roles'
+> handlers), briefly interrupting API calls through the restarted host. With the same name, the members' configuration
+> does not change and only the new node joins. The replacement's MariaDB
 > joins with a full state transfer from a healthy node, which loads it. Undo: none simple; the healthy controllers
 > keep quorum during the run.
 
@@ -152,7 +158,25 @@ kolla-ansible pull -i <inventory> --limit <replacement-host>
 kolla-ansible deploy -i <inventory> --limit control
 ```
 
-**7. Clean up the failed host's records.** With a new name, after step 6. With the same name, do this step before
+The Fernet keys reach the replacement from the first Keystone host whose `keystone_fernet` was running when the
+role checked: the replacement has none yet, so the push comes from a healthy controller (if it fails, see the
+keystone Fernet runbook in `deployment-errors/`).
+
+**7. Grow RabbitMQ's quorum queues and streams onto the replacement.**
+
+> ⚠️ **State-changing.** Adds a replica on the replacement to every quorum queue and replicates their contents: a
+> load on the RabbitMQ nodes and the network for a while. Precondition: `cluster_status` shows the three nodes
+> running. Undo: `rabbitmq-queues shrink rabbit@<replacement-short-name>`. Not observed on a lab for this page.
+
+```bash
+# on one controller
+sudo docker exec rabbitmq rabbitmq-queues grow rabbit@<replacement-short-name> all
+# streams, if om_enable_rabbitmq_stream_fanout is true: one replica per stream queue
+sudo docker exec rabbitmq rabbitmqctl list_queues name type | awk '$2=="stream"{print $1}'
+sudo docker exec rabbitmq rabbitmq-streams add_replica <stream-queue> rabbit@<replacement-short-name>
+```
+
+**8. Clean up the failed host's records.** With a new name, after step 6. With the same name, do this step before
 step 6, so that the replacement registers its agents and services fresh instead of finding the failed host's records.
 
 > 🛑 **Destructive.** Deletes the failed host's network agents and, if it ran any, its compute services from the
@@ -168,8 +192,15 @@ openstack compute service list --os-compute-api-version 2.53 --host <failed-host
 done
 ```
 
-**8. Verify** with the checks of [checking a deployment after a change](checking-a-deployment-after-a-change.md):
-Galera size 3, RabbitMQ with three running nodes, every agent alive, a test instance. Then rebalance routers and DHCP
+**9. Verify** with the checks of [checking a deployment after a change](checking-a-deployment-after-a-change.md):
+Galera size 3, RabbitMQ with three running nodes, every agent alive, a test instance. For the queues, on each node:
+
+```bash
+sudo docker exec rabbitmq rabbitmq-queues check_if_node_is_quorum_critical   # fails if stopping this node would leave a queue without a majority
+sudo docker exec rabbitmq rabbitmqctl list_queues name type members           # quorum queues list all three nodes
+```
+
+Then rebalance routers and DHCP
 networks onto the replacement if step 2 moved them.
 
 ## Key choices and their consequences
@@ -204,6 +235,9 @@ guide; the guide also says to test any such procedure before production.
 - Written from the Kolla-Ansible 2026.1 guide *Adding and removing hosts* and the bootstrap servers guide, with the
   RabbitMQ and Galera behaviour described in the deployment-error runbooks of this repository. Not run on a lab for
   this page. Status `draft`.
+- The quorum queue and stream steps follow RabbitMQ's documented membership behaviour (a joining node is not added
+  to existing quorum queues unless they are grown or membership reconciliation is enabled, which the 2026.1 role does
+  not do); not run on a lab.
 - Not covered: losing two controllers (no quorum), controllers that also hold Ceph monitors or other storage roles,
   separate network nodes (only the agents step changes), cells, and Podman.
 
