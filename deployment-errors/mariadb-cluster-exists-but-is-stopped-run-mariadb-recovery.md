@@ -73,8 +73,8 @@ From the deploy host, read-only, for each MariaDB host:
 nc -zv -w 3 <controller-api-address> 3306
 ```
 
-On a lab where the three containers were stopped within a second (`systemctl stop kolla-mariadb-container.service`),
-check 1 showed `Exited (0)` everywhere and check 2 a `seqno` on every node, with `safe_to_bootstrap: 1` only on the
+On a lab where the three containers were stopped within a few seconds (`systemctl stop
+kolla-mariadb-container.service`), check 1 showed `Exited (0)` everywhere and check 2 a `seqno` on every node, with `safe_to_bootstrap: 1` only on the
 node with the highest `seqno` (the last to stop); check 4 answered `Connection refused`.
 
 ## Diagnosis
@@ -161,7 +161,7 @@ sudo grep 'Recovered position:' /var/log/kolla/mariadb/mariadb.log | tail -n 1
 
 Keep the colon: without it, the pattern also matches `WSREP: Recovered position from storage: <uuid>:<seqno>`, which a
 node writes when it joins by state transfer, after the recovery. On the lab, `tail -n 1` without the colon returned
-that line on every node, not the line of the recovery:
+that line on every node, not the line of the recovery (illustrative lines of that form):
 
 ```text
 2026-10-27 18:18:00 0 [Note] WSREP: Recovered position: 00000000-0000-4000-8000-000000000001:6589
@@ -199,7 +199,8 @@ space, the log). Do not run `mariadb-recovery` while a node is serving data: it 
 
 ```bash
 # on each MariaDB host; -p prompts for database_password from passwords.yml (database_user, root by default);
-# -it needs a terminal (drop it in a script)
+# -it needs a terminal. Without -it (in a script) there is no prompt: give it as -p<password>, which puts it in the
+# process list and shell history
 sudo docker exec -it mariadb mariadb -uroot -p -e "SHOW STATUS WHERE Variable_name IN ('wsrep_cluster_size','wsrep_cluster_status','wsrep_local_state_comment');"
 # expected: wsrep_cluster_size = number of MariaDB hosts, Primary, Synced
 
@@ -214,9 +215,9 @@ Then a `kolla-ansible deploy` or `reconfigure` goes past *Fail on existing but s
 - Written from Kolla-Ansible 2026.1 code (`ansible/mariadb-recovery.yml`, `ansible/roles/mariadb/tasks/lookup_cluster.yml`
   and `recover_cluster.yml`) and its operating and backup guides, with Galera's crash recovery documentation for the
   background. Cause 1 was reproduced on a lab (Kolla-Ansible 22.2.0, 3 MariaDB hosts with ProxySQL, Docker): the
-  three containers stopped cleanly within a second, then `reconfigure --tags mariadb`, steps 1 to 3 and the
+  three containers stopped cleanly within a few seconds, then `reconfigure --tags mariadb`, steps 1 to 3 and the
   verification. Not run on the lab: a crash (`seqno: -1`), the forced bootstrap with
-  `mariadb_recover_inventory_name`, cause 2, a time-out on a joiner. Status `draft`.
+  `mariadb_recover_inventory_name`, cause 2, a time-out on a joiner.
 - Docker paths (`/var/lib/docker/volumes/...`); with Podman, check the volume path.
 - Not covered: several shards (the recovery works per shard group), external databases, a cluster split by a network
   partition where some nodes still serve (cause 2), and data corruption, for which the

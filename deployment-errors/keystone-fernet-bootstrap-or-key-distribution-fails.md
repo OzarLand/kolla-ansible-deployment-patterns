@@ -184,7 +184,7 @@ Make sure the push will come from a host that has the keys, then let the role re
    cron rotation:
 
    > ⚠️ **State-changing.** Stops `keystone_fernet` on the host with no keys: its rotation and pushes stop; its
-   > `keystone` API was already failing without keys. The deploy below starts it again. Undo: `systemctl start
+   > `keystone` API was already failing without keys. The deploy below starts it again. Undo: `sudo systemctl start
    > kolla-keystone_fernet-container.service`.
 
    ```bash
@@ -221,7 +221,7 @@ OpenStack 2026.1, Kolla-Ansible 22.2.0 (ansible-core output format), 3 controlle
 - Cause 1: `keystone_fernet` stopped with `systemctl` on the three controllers, then `kolla-ansible deploy --tags
   keystone --limit controller-1`: failed in 49 s at *Fail if any hosts need bootstrapping and not all hosts
   targeted*, message as shown in *Symptom* (only the targeted host named). No key was touched. The volume paths
-  showed `0` and `1` owned by `42425`; `systemctl start` on the three hosts made them `healthy` within 10 s.
+  showed `0` and `1` owned by `42425`; `systemctl start` on the three hosts made them `healthy`.
 - Cause 2, simulated with an `iptables` DROP of port 8023 on controller-3: `fernet-healthcheck.sh` on controller-1
   exited 1 and `nc` timed out. The full `deploy --tags keystone` then sat in *Waiting for Keystone SSH port to be UP*:
   three `FAILED - RETRYING` lines for controller-3 in about 18 minutes, consistent with 300 s per try (10 retries
@@ -240,7 +240,7 @@ OpenStack 2026.1, Kolla-Ansible 22.2.0 (ansible-core output format), 3 controlle
 - Written from Kolla-Ansible 2026.1 code (`ansible/roles/keystone/tasks/bootstrap_service.yml`,
   `distribute_fernet.yml`, `config.yml`, `templates/fernet-*.sh.j2`, `templates/keystone-startup.sh.j2`,
   `defaults/main.yml`, `ansible/group_vars/all/keystone.yml`) and the Keystone Fernet FAQ. Reproduced on a lab for the
-  three causes, as described in *Lab observations*. Status `draft`.
+  three causes, as described in *Lab observations*.
 - `sha256sum` of the key files is used to compare hosts without printing the keys; never paste the keys anywhere.
 - Not covered: rotating `keystone_ssh_key` (see the password rotation guide), federation, Keystone behind an external
   load balancer, and Podman.
