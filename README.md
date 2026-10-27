@@ -98,6 +98,7 @@ wrong, version notes, lessons learned, validity and limits.
 | [CPU pinning, huge pages and NUMA on Kolla-Ansible computes. Host preparation, nova.conf overrides and the scheduler filter Kolla-Ansible does not enable](configuration/cpu-pinning-hugepages-and-numa-on-computes.md) | 2026.1 | draft |
 | [TLS on the internal and external endpoints. What each switch encrypts, where the certificates go, and what changes on a running platform](configuration/tls-on-internal-and-external-endpoints.md) | 2026.1 | draft |
 | [SR-IOV with Kolla-Ansible. VFs on the host, the Neutron SR-IOV agent, the PCI whitelist Kolla-Ansible writes, and the scheduler filter](configuration/sriov-neutron-ports-and-nova-pci-alias.md) | 2026.1 | draft |
+| [A local registry and an offline deployment with Kolla-Ansible. What has to be mirrored, the variables that point at the mirrors, and the Docker setting that does not help](configuration/local-registry-and-offline-deployment.md) | 2026.1 | draft |
 
 | Service or integration | Releases | Status |
 |---|---|---|
