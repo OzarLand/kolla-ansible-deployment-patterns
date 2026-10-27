@@ -141,7 +141,10 @@ sudo docker exec rabbitmq getent ahostsv4 <short-name>
 ```
 
 If it still sees the old entry, the container must be recreated. The deploy does it when its configuration changed;
-otherwise remove it and let the deploy create it again, one RabbitMQ host at a time.
+otherwise remove it and let the deploy create it again, one RabbitMQ host at a time. The `--limit` below is the
+narrowest way to recreate one node; the operating guide advises against `--limit` in general (see
+[deploy, reconfigure, upgrade and the others](../operations/deploy-reconfigure-upgrade-and-limiting-runs.md) for the
+trade-off).
 
 > ⚠️ **State-changing.** Removes the `rabbitmq` container of this host and recreates it: this node leaves the cluster
 > until it is back, and the services connected to it reconnect to the other nodes. Its data stays in the `rabbitmq`
@@ -155,7 +158,7 @@ sudo docker rm -f rabbitmq
 kolla-ansible deploy -i <inventory> --tags rabbitmq --limit <host>
 ```
 
-Then run `kolla-ansible prechecks`, and the deploy again.
+Then run `kolla-ansible prechecks`, and the full run that failed again, without `--limit`.
 
 ### For cause 2
 
