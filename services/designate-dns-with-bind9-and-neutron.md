@@ -116,8 +116,9 @@ hosts' addresses on `dns_interface`, and NS records delegating your zone to them
 > ⚠️ **State-changing.** Creates the Designate database, service user and endpoints, the Designate and BIND9
 > containers, and reconfigures Neutron (`external_dns_driver`, the extension driver), whose containers restart where
 > their configuration changed, and Nova: enabling Designate turns on Nova's notifications in `nova.conf` (2026.1
-> templates), so the Nova containers restart, on every compute too. Running instances keep running. The new HAProxy frontend for the Designate API restarts the `haproxy` containers on every load balancer
-> host, backups first, then the VIP holder: a brief interruption of every API behind the VIPs. Plan it in a window.
+> templates), so the Nova containers restart, on every compute too. Running instances keep running. The new HAProxy
+> frontend for the Designate API restarts the `haproxy` containers on every load balancer host, backups first, then
+> the VIP holder: a brief interruption of every API behind the VIPs. Plan it in a window.
 > Undo: `enable_designate: "no"` and reconfigure Neutron and Nova; the Designate containers and HAProxy fragment stay
 > until removed by hand, as described for the monitoring page.
 
@@ -136,6 +137,15 @@ openstack zone show cloud.example.org. -c status -c serial      # ACTIVE once BI
 openstack network set <network> --dns-domain cloud.example.org.
 openstack server create --image <image> --flavor <flavor> --network <network> test-dns
 openstack recordset list cloud.example.org.                      # an A record for test-dns
+```
+
+On a self-service (tenant) network, Neutron publishes fixed-IP records only for subnets with `dns_publish_fixed_ips`
+set, the attribute the `subnet_dns_publish_fixed_ip` extension adds (default `False`; Neutron's guide, use case 3a).
+Without it, only provider networks and floating IPs get records, and the A record above does not appear. For the
+test on a tenant network:
+
+```bash
+openstack subnet set --dns-publish-fixed-ip <subnet>    # before creating the instance
 ```
 
 **4. Check each hop** (read-only):
@@ -162,7 +172,7 @@ twice: the guide's own example output shows two A records for the same instance.
 
 | Symptom | First log to read |
 |---|---|
-| Zone stays `PENDING` or goes to `ERROR` | `/var/log/kolla/designate/designate-worker.log`: rndc to BIND9 on port 953, or the pool targets |
+| Zone stays `PENDING` or goes to `ERROR` | `/var/log/kolla/designate/designate-worker.log`: rndc to BIND9 on port 953 (authentication uses `designate_rndc_key` from `passwords.yml`, rendered into `rndc.key` for the worker and BIND9), or the pool targets |
 | BIND9 has no copy of the zone | `/var/log/kolla/designate/designate-mdns.log` (zone transfers) and `/var/log/kolla/named/` on the BIND9 host |
 | API errors | `/var/log/kolla/designate/designate-api.log`, `designate-central.log` |
 | No record for a new instance | `/var/log/kolla/neutron/neutron-server.log`: the external DNS driver's calls to Designate; the network's `dns_domain` and the port's `dns_name` |
