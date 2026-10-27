@@ -1,7 +1,7 @@
 ---
 title: kolla-ansible deploy hangs on MariaDB port liveness. MariaDB exits with "Address already in use" because ProxySQL holds port 3306 on a node without HAProxy
 kind: runbook
-status: draft
+status: lab-verified
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, mariadb, proxysql, haproxy]
 deployment_methods: [kolla-ansible]
@@ -11,12 +11,13 @@ environment:
   storage: any
   os: ubuntu-24.04 (noble), docker
 risk: destructive
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: kolla-ansible all-in-one, date: 2026-10-27, note: "on an already deployed node: ProxySQL re-enabled by deploy failed to bind 3306, deploy stuck on the VIP check (stopped); MariaDB restart then failed with error 98; quick checks, enable_proxysql no, docker rm -f of the three containers, prechecks and deploy run, verification Synced; docker volume rm mariadb NOT run (volume held data); first-deploy symptom from captures of 2026-10-26 only" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/high-availability/haproxy-guide.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/quickstart.html
 authored_by: agent:ozarland-author
-last_verified: 2026-10-25
+last_verified: 2026-10-27
 ---
 
 # kolla-ansible deploy hangs on MariaDB port liveness. MariaDB exits with "Address already in use" because ProxySQL holds port 3306 on a node without HAProxy
@@ -48,8 +49,9 @@ Can't start server: Bind on TCP/IP port. Got error: 98: Address already in use
 ## Impact
 
 The deploy cannot complete: no MariaDB, so no OpenStack service. Nothing is lost, because the deployment never
-completed and the MariaDB volume holds no data yet. On a deployment that already ran, the same mismatch would stop
-MariaDB at its next restart; see *Validity and limits*.
+completed and the MariaDB volume holds no data yet. On a deployment that already ran, the same mismatch stops
+MariaDB at its next restart (observed on a lab, see *Lab observations*): every OpenStack service then loses its
+database.
 
 ## Quick checks
 
@@ -127,6 +129,23 @@ sudo docker rm -f proxysql haproxy mariadb
 sudo docker volume rm mariadb
 ```
 
+On Kolla-Ansible 2026.1 each container also has a systemd unit, which stays enabled and keeps trying to start the
+removed container (`kolla-haproxy-container.service` showed `failed` on the lab). Remove the two units, and the
+volumes the containers left:
+
+```bash
+sudo systemctl disable --now kolla-proxysql-container.service kolla-haproxy-container.service
+sudo rm /etc/systemd/system/kolla-proxysql-container.service /etc/systemd/system/kolla-haproxy-container.service
+sudo systemctl daemon-reload
+sudo systemctl reset-failed
+sudo docker volume rm proxysql proxysql_socket haproxy_socket
+```
+
+**On a deployment that already ran** (the MariaDB volume holds the databases): do the same **without** `docker
+volume rm mariadb`. On the lab, the next `deploy` found the existing cluster and started MariaDB on its volume
+(`Establish whether the cluster has already existed`, then `Restart MariaDB container`), and completed with the
+data intact.
+
 Then run the checks and the deploy again:
 
 ```bash
@@ -167,14 +186,32 @@ Met on 2026-10-21, during the first build of the [all-in-one lab](../topologies/
 
 The details are in the all-in-one lab pattern's *What went wrong during deployment*.
 
+Run again on 2026-10-27 on the same kind of lab, **already deployed** with `enable_proxysql: "no"`, by commenting
+out that line and running `kolla-ansible deploy`:
+
+- the `loadbalancer` role started `haproxy` and `proxysql`; `proxysql.log` showed `bind() error for
+  <node-address>:3306: Address already in use` (MariaDB held the port), and `proxysql` was still reported `healthy`;
+- the deploy then stayed on `Wait for MariaDB service to be ready through VIP` for 11 minutes, until it was stopped
+  (`pkill -f ansible-playbook`); why that task did not finish was not traced;
+- MariaDB kept running until it restarted. After `systemctl stop kolla-mariadb-container.service`, a restart of
+  `kolla-proxysql-container.service` (ProxySQL then listened on port 3306) and `systemctl start
+  kolla-mariadb-container.service`, `mariadb` was `Exited (1)` with `Got error: 98: Address already in use`, the
+  quick checks showed the signature above, and ProxySQL answered the services with `Access denied for user
+  'nova'@'<node-address>'`;
+- the fix without `docker volume rm mariadb` (`enable_proxysql: "no"`, the three containers removed, `prechecks`,
+  `deploy`) completed with `failed=0` in 12 minutes; the verification above gave `mariadbd` alone on port 3306 and
+  `Synced`. The removed containers left their systemd units enabled and failing, and the volumes `proxysql`,
+  `proxysql_socket`, `haproxy_socket`; they were removed as above.
+
 ## Validity and limits
 
 - Observed once, on one all-in-one build of OpenStack 2026.1 with Kolla-Ansible 22.2.0. The configuration analysis
   (listen addresses, defaults) is read from the Kolla-Ansible 2026.1 source; ProxySQL was already on by default in
   2025.1, so a 2025.1 single node with the same settings is expected to behave the same, but that was not run.
-- Not tested: a deployment that already ran with HAProxy and then turned it off (MariaDB would meet the same
-  conflict at its next restart, and its volume then holds data: the destructive step above does not apply there),
-  Podman, multinode layouts with a VIP equal to a host address.
+- A deployment that already ran (2026-10-27 lab run): ProxySQL turned on again on a running single node fails to
+  bind, and MariaDB fails at its next restart; the fix without the volume removal worked there. The `docker volume
+  rm mariadb` step itself was not run on 2026-10-27 (the volume held data).
+- Not tested: Podman, multinode layouts with a VIP equal to a host address.
 - Why a `haproxy` container ran with `enable_haproxy: "no"` was observed, not traced in the source.
 
 ## Related
