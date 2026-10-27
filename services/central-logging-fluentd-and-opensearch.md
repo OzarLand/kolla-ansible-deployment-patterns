@@ -207,13 +207,13 @@ sudo tail -20 /var/log/kolla/fluentd/fluentd.log                # on any host: n
 
 The full undo, only when `enable_opensearch` itself has become false:
 
-> ⚠️ **State-changing.** Stops Fluentd's shipping, removes the logging containers, and restarts the `haproxy`
-> container on every load balancer host to drop the frontends: every API behind the VIPs is briefly interrupted on
-> each restart, and the VIP may move while the VIP holder restarts, since keepalived tracks the HAProxy process.
+> ⚠️ **State-changing.** Stops Fluentd's shipping, removes the logging containers and their systemd units, and
+> restarts the `haproxy` container on every load balancer host to drop the frontends: every API behind the VIPs is
+> briefly interrupted on each restart, and the VIP may move while the VIP holder restarts, since keepalived tracks the HAProxy process.
 > Restart the backup hosts first, the VIP holder last, one at a time, in a window. Precondition:
 > `enable_central_logging` is `"no"` and nothing else needs OpenSearch (`enable_opensearch` false). Undo: set
-> `enable_central_logging: "yes"` again and run the deploy of *Applying it*, which recreates the containers and
-> fragments. Removing the `opensearch` volume afterwards is the one step that cannot be undone: it deletes the stored
+> `enable_central_logging: "yes"` again and run the deploy of *Applying it*, which recreates the containers, their
+> systemd units and the fragments. Removing the `opensearch` volume afterwards is the one step that cannot be undone: it deletes the stored
 > logs.
 
 ```bash
@@ -227,7 +227,7 @@ sudo systemctl daemon-reload                                 # the container uni
 # on each load balancer host
 sudo rm /etc/kolla/haproxy/services.d/opensearch.cfg /etc/kolla/haproxy/services.d/opensearch-dashboards.cfg
 ip -br addr | grep -w "<internal-vip>"                        # a line only on the VIP holder; one keepalived holds both VIPs
-sudo systemctl restart kolla-haproxy-container.service       # backups first, VIP holder last
+sudo docker restart haproxy                                  # or: sudo podman restart haproxy; backups first, VIP holder last
 sudo docker exec haproxy ls /etc/haproxy/services.d/         # or: sudo podman exec ...; the two fragments are gone
 ```
 
@@ -276,7 +276,7 @@ On an all-in-one lab (OpenStack 2026.1, Kolla-Ansible 22.2.0, Ubuntu 24.04, Dock
 
 | Step | Observed |
 |---|---|
-| `enable_central_logging: "yes"`, `kolla-ansible deploy --tags common,fluentd,loadbalancer,opensearch` | `failed=0` in 9 min 5 s. `opensearch` (heap `-Xms1g -Xmx1g`) used 1.46 GiB, Dashboards 234 MiB, Fluentd 121 MiB; available memory went from about 6 GB to 5.3 GB. 16 GB was enough for an all-in-one with a few test instances |
+| `enable_central_logging: "yes"`, `kolla-ansible deploy --tags common,fluentd,loadbalancer,opensearch` | `failed=0` in 9 min 5 s. `opensearch` (heap `-Xms1g -Xmx1g`) used 1.46 GiB, Dashboards 234 MiB, Fluentd 121 MiB; available memory went from about 6 GB to 5.3 GB. 16 GB was enough for an all-in-one with one test instance |
 | Verification | `_cluster/health`: `kolla_logging`, `yellow`, 1 node (the replica cannot be placed). `flog-2026.10.27` grew from 533 to 1660 documents in 5 minutes. `fluentd.log`: no connection errors |
 | Retention | ISM policy `retention` on `flog-*`: close at 30 days, delete at 60, applied to the day's index |
 | Index pattern | `flog-*` with `@timestamp`, created by the deploy |
