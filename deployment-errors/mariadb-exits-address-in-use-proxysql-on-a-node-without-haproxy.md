@@ -117,21 +117,43 @@ enable_proxysql: "no"
 kolla_internal_vip_address: "<node-address>"
 ```
 
-Then remove what the failed deploy left behind, so that the next deploy starts MariaDB on a clean volume:
+Then remove the containers the failed deploy left behind:
 
-> 🛑 **Destructive.** Removes the MariaDB container and its data volume, and the ProxySQL and HAProxy containers.
-> Only on a fresh deployment that never completed, where the volume holds no data yet. On any other deployment this
-> deletes every OpenStack database. Check first that no OpenStack service was ever deployed on this node
-> (`sudo docker ps -a` lists only what the failed deploy created) and that this is the node you think it is.
+> ⚠️ **State-changing.** Removes the ProxySQL, HAProxy and MariaDB containers, not their volumes. On a fresh
+> deployment that never completed, nothing else depends on them. On a deployment that already ran, this is a database
+> outage for every OpenStack service on this node until the next `deploy` starts MariaDB again. Precondition:
+> `enable_proxysql: "no"` is set as above, and this is the node you think it is. Undo: the next `deploy` recreates
+> the containers.
 
 ```bash
 sudo docker rm -f proxysql haproxy mariadb
+```
+
+**On a deployment that already ran** (the MariaDB volume holds the databases): keep the `mariadb` volume and skip
+the next block. On the lab, the next `deploy` found the existing cluster and started MariaDB on its volume
+(`Establish whether the cluster has already existed`, then `Restart MariaDB container`), and completed with the
+data intact.
+
+**Only on a fresh deployment that never completed**, remove the MariaDB volume, so that the next deploy starts
+MariaDB on a clean volume:
+
+> 🛑 **Destructive.** Deletes the MariaDB data volume. Only on a fresh deployment that never completed, where the
+> volume holds no data yet. On any other deployment this deletes every OpenStack database. Check first that no
+> OpenStack service was ever deployed on this node (`sudo docker ps -a` lists only what the failed deploy created)
+> and that this is the node you think it is. Cannot be undone.
+
+```bash
 sudo docker volume rm mariadb
 ```
 
 On Kolla-Ansible 2026.1 each container also has a systemd unit, which stays enabled and keeps trying to start the
 removed container (`kolla-haproxy-container.service` showed `failed` on the lab). Remove the two units, and the
 volumes the containers left:
+
+> ⚠️ **State-changing.** Disables and removes the `kolla-proxysql-container` and `kolla-haproxy-container` systemd
+> units, and deletes the `proxysql`, `proxysql_socket` and `haproxy_socket` volumes. Precondition:
+> `enable_proxysql: "no"` is set and the `proxysql` and `haproxy` containers are already removed (above). Undo: a
+> `deploy` with them enabled recreates the units and the volumes.
 
 ```bash
 sudo systemctl disable --now kolla-proxysql-container.service kolla-haproxy-container.service
@@ -140,11 +162,6 @@ sudo systemctl daemon-reload
 sudo systemctl reset-failed
 sudo docker volume rm proxysql proxysql_socket haproxy_socket
 ```
-
-**On a deployment that already ran** (the MariaDB volume holds the databases): do the same **without** `docker
-volume rm mariadb`. On the lab, the next `deploy` found the existing cluster and started MariaDB on its volume
-(`Establish whether the cluster has already existed`, then `Restart MariaDB container`), and completed with the
-data intact.
 
 Then run the checks and the deploy again:
 
@@ -199,7 +216,7 @@ out that line and running `kolla-ansible deploy`:
   quick checks showed the signature above, and ProxySQL answered the services with `Access denied for user
   'nova'@'<node-address>'`;
 - the fix without `docker volume rm mariadb` (`enable_proxysql: "no"`, the three containers removed, `prechecks`,
-  `deploy`) completed with `failed=0` in 12 minutes; the verification above gave `mariadbd` alone on port 3306 and
+  `deploy`) completed with `failed=0` in 11.5 minutes; the verification above gave `mariadbd` alone on port 3306 and
   `Synced`. The removed containers left their systemd units enabled and failing, and the volumes `proxysql`,
   `proxysql_socket`, `haproxy_socket`; they were removed as above.
 
@@ -210,7 +227,8 @@ out that line and running `kolla-ansible deploy`:
   2025.1, so a 2025.1 single node with the same settings is expected to behave the same, but that was not run.
 - A deployment that already ran (2026-10-27 lab run): ProxySQL turned on again on a running single node fails to
   bind, and MariaDB fails at its next restart; the fix without the volume removal worked there. The `docker volume
-  rm mariadb` step itself was not run on 2026-10-27 (the volume held data).
+  rm mariadb` step itself was not run on 2026-10-27 (the volume held data); it was run on 2026-10-21, on the fresh
+  build that never completed.
 - Not tested: Podman, multinode layouts with a VIP equal to a host address.
 - Why a `haproxy` container ran with `enable_haproxy: "no"` was observed, not traced in the source.
 
