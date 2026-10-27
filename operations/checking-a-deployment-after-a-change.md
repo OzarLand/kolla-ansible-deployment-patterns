@@ -127,11 +127,14 @@ openstack server delete --wait check-after-change
 In the console log, an image with cloud-init shows its final `finished` line after reading the metadata; a CirrOS
 image prints its own metadata lines instead. Images without a serial console log show nothing useful here.
 
-When the change touched a single host or service, target it: a host with the administrator syntax
-`--availability-zone nova:<host>` (which bypasses the scheduler filters), or with compute API 2.74 and later
-`openstack --os-compute-api-version 2.74 server create --host <host> …`, which keeps the filters and refuses a host
-that does not fit, a volume back-end with a boot-from-volume instance, the external network with a
-floating IP.
+When the change touched a single host or service, target it (targeting a host is an administrator action by
+default policy, with either syntax):
+
+- a host: `--availability-zone nova:<host>`, which bypasses the scheduler filters, or with compute API 2.74 and later
+  `openstack --os-compute-api-version 2.74 server create --host <host> …`, which keeps the filters and refuses a host
+  that does not fit;
+- a volume back-end: a boot-from-volume instance;
+- the external network: a floating IP.
 
 ## Key choices and their consequences
 

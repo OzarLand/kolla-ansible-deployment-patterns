@@ -130,8 +130,11 @@ the bootstrap setting. The role's waits are about 10 × 6 seconds for a joiner's
 `docker logs mariadb` there for the transfer's progress before running anything again.
 
 **3. Check which host was chosen, and why** (read-only). The role writes the chosen host to
-`/tmp/kolla_mariadb_recover_inventory_name_<shard>` on the deploy host. On each node, the position the comparison
-used is the last `Recovered position` line of the MariaDB log:
+`/tmp/kolla_mariadb_recover_inventory_name_<shard>` on the deploy host (not on a forced run with
+`mariadb_recover_inventory_name`, which writes none and removes an old one). On each node, the position the
+comparison used is the last `Recovered position` line of the MariaDB log. Running the same `grep` on each node
+**before** step 2 too (a line from an earlier recovery attempt or a manual `--wsrep-recover`) catches a missing or
+stale position before the bootstrap, when the services are not writing yet:
 
 ```bash
 grep 'Recovered position' /var/log/kolla/mariadb/mariadb.log | tail -n 1
