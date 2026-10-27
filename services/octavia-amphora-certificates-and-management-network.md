@@ -295,6 +295,27 @@ one; changing it on a platform with running load balancers is not described by O
 tested here: expect their heartbeats to stop being accepted until they are failed over, and plan it like an amphora
 image rotation.
 
+The override takes effect with `kolla-ansible reconfigure -i <inventory> --tags octavia`, the command already shown
+under *Renewing what expires* with its ⚠️: it rewrites `octavia.conf` and restarts the Octavia containers whose
+configuration changed.
+
+An alternative to failing every amphora over: Octavia has an administrative API that updates the amphora agent
+configuration on running amphorae (release note *Add-amphora-agent-config-update-API*), and the agent configuration it
+pushes includes `heartbeat_key` (`octavia/amphorae/backends/agent/agent_jinja_cfg.py`). From the client:
+
+> ⚠️ **State-changing.** Rewrites the agent configuration inside one running amphora. Amphorae built from an image
+> whose agent does not support it log an error on the controller and are not changed (release note). Not tested
+> here, including the order to follow: controllers first then amphorae, or the reverse, and what the health managers
+> accept in between. Try it on a lab first. An earlier version of this API updated only the agent configuration, not
+> the running health sender (release note *Fix-Amphora-Config-Update*): with an older amphora image, do not assume the
+> new key reached the heartbeats. Undo: put the previous key back in the override, run `reconfigure --tags octavia`
+> and `amphora configure` again, or fail the amphora over (`openstack loadbalancer amphora failover <amphora-id>`) so
+> that it is rebuilt with the controllers' current configuration.
+
+```bash
+openstack loadbalancer amphora configure <amphora-id>
+```
+
 ## What went wrong during deployment
 
 Nothing observed yet: this page was written from the documentation and the 2026.1 roles. Failures the 2026.1 code
