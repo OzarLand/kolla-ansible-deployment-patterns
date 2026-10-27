@@ -78,7 +78,7 @@ differ are restarted. So a `reconfigure` after a change in one service's overrid
 without `--tags`. What `--tags` saves is time, and exposure to changes you did not mean to apply.
 
 The run's `changed` count does not count restarts. On a 2026.1 all-in-one lab, a full `reconfigure` after a change
-in Glance's override ended with `changed=22` (bootstrap containers of Keystone, Glance, Neutron, Heat and Placement,
+in Glance's override ended with `changed=22` (bootstrap containers of 5 services,
 Keystone user registration, Fernet key distribution …) and restarted `glance_api` only. The restarts show as
 `Notify handlers to restart containers for <service>` among the changed tasks; `docker inspect -f
 '{{.Name}} {{.State.StartedAt}}'` before and after the run confirms them.
@@ -131,8 +131,8 @@ control`) when controllers are added or removed.
    `drwxrwx--- root root`, and `docker exec` runs as the service user (`glance` for `glance_api`), hence `-u root`;
    without it `diff` fails with `Permission denied`.
 
-   `validate-config` exits 0 even when it finds errors: read the reports under
-   `/var/log/kolla/config-validate/<host>/<service>/<container>/*.err`. On 2026.1 the Glance report holds two `ERROR`
+   `validate-config` exits 0 even when it finds errors: read the reports, which it writes on the deploy host
+   (`delegate_to: localhost`), under `/var/log/kolla/config-validate/<host>/<project>/<service-name>/*.err`. On 2026.1 the Glance report holds two `ERROR`
    lines for options Kolla-Ansible itself sets (`os_glance_tasks_store/filesystem_store_datadir is not part of the
    sample config`, same for `os_glance_staging_store`); compare with a report taken before your change.
 

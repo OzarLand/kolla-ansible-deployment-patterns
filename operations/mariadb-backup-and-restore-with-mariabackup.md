@@ -118,7 +118,7 @@ last_full_file
 ```
 
 On that lab (about 100 MB of OpenStack databases once prepared), the full backup took 37 s and the incremental 58 s,
-and the compressed full backup was 1.8 MB. To list the files themselves, use a root shell (`sudo bash -c 'ls -lh
+and the compressed full backup was 1.8 MB (`ls -lh` in the run's backup capture). To list the files themselves, use a root shell (`sudo bash -c 'ls -lh
 /var/lib/docker/volumes/mariadb_backup/_data/*/'`): with `sudo ls …/_data/*/` your own shell expands the glob and
 cannot read the directory.
 
@@ -290,7 +290,7 @@ backup reaches the cluster through the VIP; in 2026.1 the backup configuration n
   22.2.0, 3 MariaDB 11.4.13 nodes behind ProxySQL, Docker, about 100 MB of data): enabling, a full and an incremental
   backup, and the whole restore with the full emptying of the other nodes. Not run: the lighter `grastate.dat`
   variant, a single-node restore, `rsync` off the host, several incrementals, a large database (SST and role
-  time-outs). Status `draft`.
+  time-outs).
 - Docker only; with Podman, replace `docker` and check the volume path.
 - Not covered: several shards, external databases (`use_preconfigured_databases`), point-in-time recovery with binary
   logs, restoring one database alone.

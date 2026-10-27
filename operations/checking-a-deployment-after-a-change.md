@@ -69,7 +69,7 @@ The following <service> containers are missing or not running: <containers>
 The following <service> containers are unhealthy: <containers>
 ```
 
-Captured on a lab (Kolla-Ansible 22.2.0, 3 controllers and 2 computes; the run took about 40 s), with `nova_metadata`
+Captured on a lab (Kolla-Ansible 22.2.0, 3 controllers and 2 computes; a healthy run took 41 s), with `nova_metadata`
 stopped on one controller:
 
 ```text
@@ -144,7 +144,7 @@ openstack server delete --wait check-after-change
 ```
 
 In the console log, an image with cloud-init shows its final `finished` line after reading the metadata; a CirrOS
-image prints its own metadata lines instead (on the lab, CirrOS 0.6.3, about 30 s after `ACTIVE`):
+image prints its own metadata lines instead (on the lab, CirrOS 0.6.3; lines from the run's instance capture):
 
 ```text
 === datasource: ec2 net ===
@@ -152,7 +152,7 @@ instance-id: i-0000000c
 ...
 === cirros: current=0.6.3 uptime=23.46 ===
 ```
- Images without a serial console log show nothing useful here.
+Images without a serial console log show nothing useful here.
 
 When the change touched a single host or service, target it (targeting a host is an administrator action by
 default policy, with either syntax):
@@ -195,9 +195,9 @@ return codes are documented by Nova 2026.1 (0 success, 1 warnings, 2 or more fai
 - Written from the Kolla-Ansible 2026.1 code (`kolla_ansible/cli/commands.py` `check`, `ansible/roles/service-check/`,
   `ansible/roles/mariadb/tasks/check.yml`) and documentation, and the Nova `nova-status` documentation. Every step was
   run on a lab (Kolla-Ansible 22.2.0, 3 controllers and 2 computes, ML2/OVS, no Cinder, Docker), with one container
-  stopped to see `kolla-ansible check` fail; `openstack volume service list` fails there without Cinder (`Service
-  'block-storage' is disabled because its configuration could not be loaded`), and access through the floating IP
-  was not tested (the floating IP was created, attached and deleted). Status `draft`.
+  stopped to see `kolla-ansible check` fail; `openstack volume service list` fails there without Cinder (the run's capture
+  shows `Service 'block-storage' is disabled because its configuration could not be loaded`), and access through the floating IP
+  was not tested (the floating IP was created, attached and deleted).
 - Not covered: monitoring-based checks (Prometheus, Grafana), Octavia, Designate and other optional services, and
   Podman (replace `docker`).
 
