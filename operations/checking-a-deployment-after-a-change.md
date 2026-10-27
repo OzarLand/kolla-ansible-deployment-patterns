@@ -1,7 +1,7 @@
 ---
 title: Checking a Kolla-Ansible deployment after a change. kolla-ansible check, cluster state, service lists and one real instance
 kind: pattern
-status: draft
+status: lab-verified
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, mariadb, rabbitmq, nova, neutron, keystone, docker]
 deployment_methods: [kolla-ansible]
@@ -12,7 +12,8 @@ environment:
   storage: any
   os: any supported by Kolla-Ansible 2026.1
 risk: state-changing
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, 3 controllers + 2 computes, ML2/OVS, no Cinder, Docker", date: 2026-10-27, note: "every step run; kolla-ansible check run healthy and with nova_metadata stopped (the page's message); the step 5 find needed /var/log/kolla/ with a trailing slash; Galera query without -it; test instance ACTIVE, floating IP created, attached and deleted. Not run: volume service list with Cinder, external access through the floating IP, ML2/OVN, the --host / availability-zone targeting" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/user/operating-kolla.html
   - https://docs.openstack.org/kolla-ansible/2026.1/user/troubleshooting.html
@@ -68,6 +69,17 @@ The following <service> containers are missing or not running: <containers>
 The following <service> containers are unhealthy: <containers>
 ```
 
+Captured on a lab (Kolla-Ansible 22.2.0, 3 controllers and 2 computes; a healthy run took 41 s), with `nova_metadata`
+stopped on one controller:
+
+```text
+[ERROR]: Task failed: Action failed: The following nova containers are missing or not running: nova_metadata
+fatal: [controller-3]: FAILED! => {"changed": false, "msg": "The following nova containers are missing or not running: nova_metadata\n"}
+```
+
+The failed host then skipped the checks of the roles after `nova` (`ok=28` against `ok=36` for the other
+controllers in the recap).
+
 **2. Containers on each host,** for what `check` does not cover (restarts that recovered, recent exits):
 
 ```bash
@@ -78,7 +90,8 @@ sudo docker ps -a --format '{{.Names}}\t{{.Status}}' | grep -v 'Up .* (healthy)'
 **3. The clustered services,** on one controller:
 
 ```bash
-# Galera: cluster size, Primary, Synced; -p prompts for database_password from passwords.yml
+# Galera: cluster size, Primary, Synced; -p prompts for database_password from passwords.yml;
+# -it needs a terminal (drop it in a script)
 sudo docker exec -it mariadb mariadb -uroot -p -e "SHOW STATUS WHERE Variable_name IN ('wsrep_cluster_size','wsrep_cluster_status','wsrep_local_state_comment');"
 
 # RabbitMQ: every node running, no partitions, no alarms
@@ -100,8 +113,14 @@ sudo docker exec nova_api nova-status upgrade check   # on a controller; 0 = pas
 **5. The logs since the change,** on each host, for errors the checks above do not show:
 
 ```bash
-sudo find /var/log/kolla -name '*.log' -newermt '<time of the change>' -exec grep -l -E ' (ERROR|CRITICAL) ' {} +
+sudo find /var/log/kolla/ -name '*.log' -newermt '<time of the change>' -exec grep -l -E ' (ERROR|CRITICAL) ' {} +
 ```
+
+Keep the trailing slash: on Kolla-Ansible 2026.1 `/var/log/kolla` is a symbolic link to the `kolla_logs` volume
+(`/var/lib/docker/volumes/kolla_logs/_data`), and `find /var/log/kolla` without the slash does not enter it: on the
+lab it listed nothing, while the same command with `/var/log/kolla/` listed 12 files on a controller. The command
+lists files written since the change that contain an `ERROR` line anywhere, older ones included: grep each file for
+the change's time.
 
 Read the files it lists; an `ERROR` right after a restart (a reconnection) can be normal, one that repeats is not.
 
@@ -125,7 +144,15 @@ openstack server delete --wait check-after-change
 ```
 
 In the console log, an image with cloud-init shows its final `finished` line after reading the metadata; a CirrOS
-image prints its own metadata lines instead. Images without a serial console log show nothing useful here.
+image prints its own metadata lines instead (on the lab, CirrOS 0.6.3; lines from the run's instance capture):
+
+```text
+=== datasource: ec2 net ===
+instance-id: i-0000000c
+...
+=== cirros: current=0.6.3 uptime=23.46 ===
+```
+Images without a serial console log show nothing useful here.
 
 When the change touched a single host or service, target it (targeting a host is an administrator action by
 default policy, with either syntax):
@@ -166,8 +193,11 @@ return codes are documented by Nova 2026.1 (0 success, 1 warnings, 2 or more fai
 ## Validity and limits
 
 - Written from the Kolla-Ansible 2026.1 code (`kolla_ansible/cli/commands.py` `check`, `ansible/roles/service-check/`,
-  `ansible/roles/mariadb/tasks/check.yml`) and documentation, and the Nova `nova-status` documentation. Not run on a
-  lab for this page. Status `draft`.
+  `ansible/roles/mariadb/tasks/check.yml`) and documentation, and the Nova `nova-status` documentation. Every step was
+  run on a lab (Kolla-Ansible 22.2.0, 3 controllers and 2 computes, ML2/OVS, no Cinder, Docker), with one container
+  stopped to see `kolla-ansible check` fail; `openstack volume service list` fails there without Cinder (the run's capture
+  shows `Service 'block-storage' is disabled because its configuration could not be loaded`), and access through the floating IP
+  was not tested (the floating IP was created, attached and deleted).
 - Not covered: monitoring-based checks (Prometheus, Grafana), Octavia, Designate and other optional services, and
   Podman (replace `docker`).
 

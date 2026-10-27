@@ -1,7 +1,7 @@
 ---
 title: Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup
 kind: pattern
-status: draft
+status: lab-verified
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, mariadb, docker]
 deployment_methods: [kolla-ansible]
@@ -12,13 +12,14 @@ environment:
   storage: any
   os: any supported by Kolla-Ansible 2026.1
 risk: destructive
-confirmed_by: []
+confirmed_by:
+  - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, 3 controllers (Galera behind ProxySQL) + 2 computes, Docker", date: 2026-10-27, note: "enable, full and incremental backups, and the full restore run as written (steps 1-3 in temporary containers through bash -c, kolla-ansible stop, copy-back, other nodes emptied, mariadb-recovery with mariadb_recover_inventory_name): 3 nodes Synced, data at the incremental's point, test build ACTIVE. Not run: rsync off the host, the lighter grastate.dat variant, a single-node restore, several incrementals, a large database" }
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/admin/mariadb-backup-and-restore.html
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/databases/mariadb-guide.html
   - https://mariadb.com/kb/en/mariadb-backup-overview/
 authored_by: agent:ozarland-author
-last_verified: 2026-10-26
+last_verified: 2026-10-27
 ---
 
 # Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup
@@ -107,6 +108,20 @@ sudo ls -lh /var/lib/docker/volumes/mariadb_backup/_data/
 sudo rsync -a /var/lib/docker/volumes/mariadb_backup/_data/ <backup-user>@<backup-server>:<backup-path>/
 ```
 
+What the volume held on a lab after one full and one incremental backup (each backup in its own directory; the
+incremental names the full one it builds on; `last_full_file` points at the latest full backup):
+
+```text
+full-27-10-2026-1793125994/mysqlbackup-27-10-2026-1793125994.qp.xbc.xbs.gz
+incr-18-33-53-27-10-2026-since-27-10-2026-1793125994/incremental-18-33-53-27-10-2026-mysqlbackup-27-10-2026-1793125994.qp.xbc.xbs.gz
+last_full_file
+```
+
+On that lab (about 100 MB of OpenStack databases once prepared), the full backup took 37 s and the incremental 58 s,
+and the compressed full backup was 1.8 MB (`ls -lh` in the run's backup capture). To list the files themselves, use a root shell (`sudo bash -c 'ls -lh
+/var/lib/docker/volumes/mariadb_backup/_data/*/'`): with `sudo ls …/_data/*/` your own shell expands the glob and
+cannot read the directory.
+
 Test a restore on a lab from time to time: an untested backup is a hope, not a backup.
 
 ## Restoring
@@ -132,7 +147,7 @@ sudo docker run --rm -it --volumes-from mariadb --name dbrestore \
 # inside the container
 cd /backup
 rm -rf /backup/restore && mkdir -p /backup/restore/full
-gunzip <full-backup-file>.qp.xbc.xbs.gz
+gunzip <full-backup-file>.qp.xbc.xbs.gz      # with its directory: full-<date>-<n>/mysqlbackup-<date>-<n>…
 mbstream -x -C /backup/restore/full/ < <full-backup-file>.qp.xbc.xbs
 mariabackup --prepare --target-dir /backup/restore/full
 ```
@@ -144,7 +159,7 @@ see `/backup/restore`.
 
 ```bash
 mkdir -p /backup/restore/inc
-gunzip <incremental-backup-file>.qp.xbc.xbs.gz
+gunzip <incremental-backup-file>.qp.xbc.xbs.gz     # incr-<time>-<date>-since-<date>-<n>/incremental-…
 mbstream -x -C /backup/restore/inc < <incremental-backup-file>.qp.xbc.xbs
 mariabackup --prepare --incremental-dir=/backup/restore/inc --target-dir /backup/restore/full
 ```
@@ -185,8 +200,16 @@ Why the extra step: after a restore, the other nodes hold data that is **newer**
 (`recover_cluster.yml`). A node whose saved position is ahead of the new cluster's normally refuses to join (Galera
 reports that the states diverged) instead of taking a full state transfer (SST) by itself. The upstream guide does
 not cover this. Emptying the data directory of each other node makes it join as a new node, which always takes a
-full SST from the cluster. This follows from how Galera works and from the role's code; it has not been observed on a
-lab for this page.
+full SST from the cluster. This follows from how Galera works and from the role's code. The refusal of a node that was
+not emptied was not observed on a lab.
+
+The emptying path was run on a lab (3 nodes; full backup plus one incremental; steps 1 to 4 as written, the `docker run -it … bash`
+commands given to `bash -c` instead): the restored node has no `grastate.dat` after the copy-back, and the play handled
+it; both emptied nodes took a full SST (`wsrep_sst_mariabackup`) from the restored node, one after the other (the
+second logged `requested state transfer from '*any*', but it is impossible to select State Transfer donor: No donor
+candidates temporarily available` until the first had finished); the run took 3 min 9 s and ended with every node
+`Synced`. The database then held what existed at the incremental backup: a network created between the full and the
+incremental backups was there, one created after the incremental was gone. A test instance went `ACTIVE` in 26 s.
 
 First, on each other MariaDB node (never on the restored one), check that its `mariadb` container is stopped. The
 commands of this page assume Docker; with Podman, use `podman` and the volume path under
@@ -238,7 +261,8 @@ kolla-ansible mariadb-recovery -i <inventory> -e mariadb_recover_inventory_name=
 
 ## What went wrong during deployment
 
-Nothing observed for this page. Points that follow from the code and the guide:
+Nothing went wrong on the lab run (enable, full and incremental backups, restore). Points that follow from the code
+and the guide:
 
 - `mariadb-backup` does nothing unless `enable_mariabackup` is set and the `reconfigure --tags mariadb` ran: the play
   only runs the role `when: enable_mariabackup`.
@@ -262,8 +286,11 @@ backup reaches the cluster through the VIP; in 2026.1 the backup configuration n
 
 - Written from the Kolla-Ansible 2026.1 guide (*MariaDB database backup and restore*, *MariaDB guide*) and the code of
   `ansible/mariadb-backup.yml`, `ansible/mariadb-recovery.yml` and `ansible/roles/mariadb/` (`backup.yml`,
-  `config.yml`, `register.yml`, `recover_cluster.yml`, `templates/backup.my.cnf.j2`). Not run on a lab for this
-  page. Status `draft`.
+  `config.yml`, `register.yml`, `recover_cluster.yml`, `templates/backup.my.cnf.j2`). Run on a lab (Kolla-Ansible
+  22.2.0, 3 MariaDB 11.4.13 nodes behind ProxySQL, Docker, about 100 MB of data): enabling, a full and an incremental
+  backup, and the whole restore with the full emptying of the other nodes. Not run: the lighter `grastate.dat`
+  variant, a single-node restore, `rsync` off the host, several incrementals, a large database (SST and role
+  time-outs).
 - Docker only; with Podman, replace `docker` and check the volume path.
 - Not covered: several shards, external databases (`use_preconfigured_databases`), point-in-time recovery with binary
   logs, restoring one database alone.
