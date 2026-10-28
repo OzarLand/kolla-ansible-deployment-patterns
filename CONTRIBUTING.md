@@ -20,4 +20,7 @@ Repository-specific notes:
   `configuration/`, a solved deployment error in `deployment-errors/`, a day-2 procedure in `operations/`,
   release-specific notes in `version-notes/`, and side-by-side comparisons in `comparisons/`.
 - Name the file after the pattern or symptom, lowercase, hyphenated.
-- Add the page to the index table in `README.md` in the same pull request.
+- Add the page to the index table in `README.md` in the same pull request. The status badges and progress bars
+  are generated: after adding a page or changing a `status:`, run `tools/status_blocks.py --write` from the
+  [ozarland](https://github.com/OzarLand/ozarland) repository (usage at the top of the script) and commit what it
+  changes in `README.md`.

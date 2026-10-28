@@ -7,10 +7,12 @@
 **Ways to deploy OpenStack with Kolla-Ansible, compared side by side.**
 
 <p>
+<!-- status-badges:start -->
   <img src="https://img.shields.io/badge/pages-39-informational.svg" alt="39 pages">
   <img src="https://img.shields.io/badge/lab--verified-9-16a34a.svg" alt="9 pages lab-verified">
   <img src="https://img.shields.io/badge/draft-30-9ca3af.svg" alt="30 pages draft">
   <img src="https://img.shields.io/badge/validated-0-2563eb.svg" alt="0 pages validated">
+<!-- status-badges:end -->
   <img src="https://img.shields.io/badge/OpenStack-2026.1-ED1944.svg" alt="OpenStack 2026.1">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue.svg" alt="License: Apache-2.0"></a>
 </p>
@@ -127,9 +129,10 @@ flowchart LR
 
 </details>
 
-**Where things stand (2026-10-28):** 39 pages, 9 `lab-verified`, 30 `draft`, none `validated`.
+<!-- status-progress:start -->
+**Where things stand:** 39 pages, 9 `lab-verified`, 30 `draft`, none `validated` or `experimental`.
 
-| Folder | Progress | Lab-verified |
+| Folder | Progress | Lab-verified or validated |
 |---|---|---:|
 | 🏗️ Topologies | 🟩🟩🟩🟩🟩⬜⬜⬜⬜⬜ | 1 / 2 |
 | 🌐 Networking | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ | 0 / 2 |
@@ -142,7 +145,7 @@ flowchart LR
 | ⚖️ Comparisons | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ | 0 / 4 |
 
 <sub>🟩 lab-verified · ⬜ draft · one square is about 10 % of the folder's pages</sub>
-
+<!-- status-progress:end -->
 > [!WARNING]
 > Nothing here has been confirmed on a production platform. Lab verification so far was done by OzarLand's AI lab
 > agent on Kolla-Ansible 22.2.0 (OpenStack 2026.1) with Docker (Ubuntu 24.04 where the page records the OS), on
