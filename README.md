@@ -31,7 +31,7 @@
 Written so far from upstream documentation and lab builds; **operators' own patterns are what this repository is
 waiting for.**
 
-Part of [🏝️ OzarLand](https://github.com/OzarLand/ozarland), a collaborative knowledge-sharing space for OpenStack
+Part of [OzarLand](https://github.com/OzarLand/ozarland), a collaborative knowledge-sharing space for OpenStack
 operators. Share experiences, document solutions, learn from each other. No imposed tools, no single way of
 operating OpenStack. The [🤖 openstack-operator-skills](https://github.com/OzarLand/openstack-operator-skills)
 Claude skills draw on these pages and carry their status with them; a correction belongs here first.
