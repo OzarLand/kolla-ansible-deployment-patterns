@@ -2,11 +2,13 @@
 
 # kolla-ansible-deployment-patterns
 
-**How operators actually deploy OpenStack with Kolla-Ansible, compared side by side.**
+**Ways to deploy OpenStack with Kolla-Ansible, compared side by side.** Written so far from upstream documentation
+and lab builds; operators' own patterns are what this repository is waiting for.
 
 Part of [OzarLand](https://github.com/OzarLand/ozarland), a collaborative knowledge-sharing space for OpenStack
 operators. Share experiences, document solutions, learn from each other. No imposed tools, no single way of
-operating OpenStack.
+operating OpenStack. The [openstack-operator-skills](https://github.com/OzarLand/openstack-operator-skills) Claude skills
+draw on these pages and carry their status with them; a correction belongs here first.
 
 ## Scope
 
@@ -30,7 +32,8 @@ and the lessons its operators learned. Two patterns can contradict each other an
 - Errors met during deployment and reconfiguration, with their causes and fixes.
 - Differences between Kolla-Ansible and OpenStack releases that affect a pattern, and the precautions they require.
 
-**Out of scope:** running instances (see `openstack-vm-runbooks`), upgrading (see `openstack-upgrade-playbooks`),
+**Out of scope:** running instances (see `openstack-vm-runbooks`), upgrade campaigns beyond release notes (planned for a future `openstack-upgrade-playbooks` repository; until it
+exists, release notes and upgrade reports live in `version-notes/`),
 other deployment tools (welcome as separate pattern repositories when their operators show up), and anything
 that reproduces the upstream documentation instead of adding operational experience to it.
 
@@ -49,16 +52,36 @@ comparisons/       side-by-side comparisons of patterns on one dimension (e.g. O
 templates/         deployment-pattern template
 ```
 
-Each pattern follows the shared [deployment pattern template](https://github.com/OzarLand/ozarland/blob/main/community/templates/deployment-pattern.md):
+Pattern pages follow the shared [deployment pattern template](https://github.com/OzarLand/ozarland/blob/main/community/templates/deployment-pattern.md):
 context, topology, network, storage, inventory and configuration layout, key choices and consequences, what went
-wrong, version notes, lessons learned, validity and limits.
+wrong, version notes, lessons learned, validity and limits. Deployment errors and day-2 operations follow the
+[runbook template](https://github.com/OzarLand/ozarland/blob/main/community/templates/runbook.md).
+
+## How much each page was checked
+
+Every page carries a status in its front matter and in the index below
+([knowledge lifecycle](https://github.com/OzarLand/ozarland/blob/main/docs/knowledge-lifecycle.md#page-statuses)):
+
+| Status | What it means |
+|---|---|
+| `draft` | Written; its commands have not been run by anyone other than the author. |
+| `lab-verified` | Its commands were run on a lab by someone other than the author, on the release stated in the page, and behaved as the page says. |
+| `validated` | Confirmed by a human operator, other than the author, on a real platform. |
+| `experimental` | Possibly outdated, or confirmed only under narrow conditions. |
+
+Today no page is `validated`: nothing here has been confirmed on a production platform. Lab verification so far
+was done by OzarLand's AI lab agent on Kolla-Ansible 22.2.0 (OpenStack 2026.1) with Docker (Ubuntu 24.04 where
+the page records the OS), on small labs nested in an existing OpenStack cloud (all-in-one, or 3 controllers and
+2 computes); each page's `confirmed_by` says
+what was run and what was not. No pattern here is presented as production-ready. Read a `draft` page as a
+well-sourced lead, and check every page's *Validity and limits* section before relying on it.
 
 ## Index
 
-| Pattern | Purpose | Scale | Network | Storage | Releases |
-|---|---|---|---|---|---|
-| [Three controllers and two computes, nested inside an existing OpenStack cloud](topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md) | lab | 3 controllers, 2 computes | OVS, VXLAN | local instance store | 2026.1 |
-| [All-in-one lab on a single VM, nested inside an existing OpenStack cloud](topologies/all-in-one-lab-on-a-single-vm.md) | lab | 1 node (all-in-one) | OVS | local root disk | 2026.1 |
+| Pattern | Purpose | Scale | Network | Storage | Releases | Status |
+|---|---|---|---|---|---|---|
+| [Three controllers and two computes, nested inside an existing OpenStack cloud](topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md) | lab | 3 controllers, 2 computes | OVS, VXLAN | local instance store | 2026.1 | draft |
+| [All-in-one lab on a single VM, nested inside an existing OpenStack cloud](topologies/all-in-one-lab-on-a-single-vm.md) | lab | 1 node (all-in-one) | OVS | local root disk | 2026.1 | lab-verified |
 
 | Networking pattern | Releases | Status |
 |---|---|---|
@@ -68,22 +91,22 @@ wrong, version notes, lessons learned, validity and limits.
 | Deployment error | Releases | Status |
 |---|---|---|
 | [kolla-ansible deploy fails part-way because Ubuntu upgraded packages during the deploy](deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md) | 2026.1 | lab-verified |
-| [kolla-ansible deploy hangs on MariaDB port liveness: ProxySQL holds port 3306 on a node without HAProxy](deployment-errors/mariadb-exits-address-in-use-proxysql-on-a-node-without-haproxy.md) | 2026.1 | draft |
-| [kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client": Docker does not know the registry is plain HTTP](deployment-errors/pull-fails-http-response-to-https-client-insecure-registry.md) | 2026.1 | draft |
+| [kolla-ansible deploy hangs on MariaDB port liveness: ProxySQL holds port 3306 on a node without HAProxy](deployment-errors/mariadb-exits-address-in-use-proxysql-on-a-node-without-haproxy.md) | 2026.1 | lab-verified |
+| [kolla-ansible pull fails with "http: server gave HTTP response to HTTPS client": Docker does not know the registry is plain HTTP](deployment-errors/pull-fails-http-response-to-https-client-insecure-registry.md) | 2026.1 | lab-verified |
 | [kolla-ansible deploy times out at "Wait for haproxy to listen on VIP": the internal VIP never comes up, or cannot be reached](deployment-errors/deploy-times-out-waiting-for-haproxy-on-the-internal-vip.md) | 2026.1 | draft |
 | [kolla-ansible deploy fails with "The following Nova compute services failed to register themselves"](deployment-errors/nova-compute-services-failed-to-register.md) | 2026.1 | draft |
 | [kolla-ansible prechecks fails with "Ansible version should be between ...", or plays fail on missing modules: the wrong Ansible or collections on the deploy host](deployment-errors/ansible-version-not-supported-or-wrong-ansible-on-the-deploy-host.md) | 2026.1 | draft |
 | [RabbitMQ nodes do not form a cluster during kolla-ansible deploy: host name resolution, the Erlang cookie, closed ports or old cluster state](deployment-errors/rabbitmq-nodes-do-not-form-a-cluster.md) | 2026.1 | draft |
-| [kolla-ansible deploy fails in the keystone role: Fernet bootstrap refused under --limit, key distribution over SSH failing, or keystone waiting for key 0](deployment-errors/keystone-fernet-bootstrap-or-key-distribution-fails.md) | 2026.1 | draft |
-| [kolla-ansible fails with "MariaDB cluster exists but is stopped": recovering a fully stopped Galera cluster with kolla-ansible mariadb-recovery](deployment-errors/mariadb-cluster-exists-but-is-stopped-run-mariadb-recovery.md) | 2026.1 | draft |
+| [kolla-ansible deploy fails in the keystone role: Fernet bootstrap refused under --limit, key distribution over SSH failing, or keystone waiting for key 0](deployment-errors/keystone-fernet-bootstrap-or-key-distribution-fails.md) | 2026.1 | lab-verified |
+| [kolla-ansible fails with "MariaDB cluster exists but is stopped": recovering a fully stopped Galera cluster with kolla-ansible mariadb-recovery](deployment-errors/mariadb-cluster-exists-but-is-stopped-run-mariadb-recovery.md) | 2026.1 | lab-verified |
 
 | Operations | Releases | Status |
 |---|---|---|
 | [Adding a compute node to a running Kolla-Ansible deployment](operations/adding-a-compute-node.md) | 2026.1 | draft |
 | [deploy, reconfigure, upgrade and the others. Which kolla-ansible command to run after a change, and how to narrow it with --limit and --tags](operations/deploy-reconfigure-upgrade-and-limiting-runs.md) | 2026.1 | draft |
 | [Removing or replacing a compute node in a Kolla-Ansible deployment](operations/removing-or-replacing-a-compute-node.md) | 2026.1 | draft |
-| [Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup](operations/mariadb-backup-and-restore-with-mariabackup.md) | 2026.1 | draft |
-| [Checking a Kolla-Ansible deployment after a change. kolla-ansible check, cluster state, service lists and one real instance](operations/checking-a-deployment-after-a-change.md) | 2026.1 | draft |
+| [Backing up and restoring the MariaDB cluster with kolla-ansible mariadb-backup](operations/mariadb-backup-and-restore-with-mariabackup.md) | 2026.1 | lab-verified |
+| [Checking a Kolla-Ansible deployment after a change. kolla-ansible check, cluster state, service lists and one real instance](operations/checking-a-deployment-after-a-change.md) | 2026.1 | lab-verified |
 | [Replacing a failed controller in a three-controller Kolla-Ansible deployment](operations/replacing-a-failed-controller.md) | 2026.1 | draft |
 | [kolla-ansible bootstrap-servers. What it changes on the hosts, and the pitfalls of running it again on a live platform](operations/bootstrap-servers-what-it-changes-and-its-pitfalls.md) | 2026.1 | draft |
 
@@ -126,10 +149,10 @@ wrong, version notes, lessons learned, validity and limits.
 
 ## First pages to write
 
-1. Three controllers, OVN, Ceph RBD: a common production baseline, with its consequences.
+1. Three controllers, OVN, Ceph RBD, as run on a real platform, with its consequences.
 2. Separated storage and storage-replication networks: why, and what it costs.
-3. Keeping lab, pre-production and production inventories aligned: one layout that worked.
-4. Deployment errors: the five most common `kolla-ansible deploy` failures and what they meant.
+3. Keeping lab, pre-production and production inventories aligned, from a real multi-environment platform.
+4. Any pattern you run in production: the context and the consequences matter more than the configuration.
 
 ## Contributing
 
