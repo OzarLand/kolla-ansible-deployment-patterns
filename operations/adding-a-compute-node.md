@@ -164,8 +164,11 @@ Near the end of the Nova part, Kolla-Ansible waits for the new `nova-compute` se
 seconds apart), then runs `nova-manage cell_v2 discover_hosts --by-service` in a cell conductor container so that the
 host is mapped to its cell. You do not run `discover_hosts` yourself. If the service never registers, the deploy
 fails on that host with `The following Nova compute services failed to register themselves: <host>`; read
-`/var/log/kolla/nova/nova-compute.log` on the new host (most often it cannot reach RabbitMQ or the placement API, or
-libvirt did not start).
+`/var/log/kolla/nova/nova-compute.log` on the new host: most often libvirt did not start, it cannot reach RabbitMQ, or
+it registered under another host name (see
+[Nova compute services failed to register](../deployment-errors/nova-compute-services-failed-to-register.md)).
+Placement or Keystone errors do not block the registration: such a host passes this wait but gets no resource
+provider, which the `openstack resource provider list` check of step 6 catches.
 
 **6. Verify, then test with an instance.**
 

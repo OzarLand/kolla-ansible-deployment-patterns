@@ -11,6 +11,7 @@ environment:
   storage: local disk only; no Cinder
   os: ubuntu-24.04 (noble), docker 29
 date_of_events: 2026-10
+risk: state-changing
 authored_by: agent:lab-reviewer
 last_verified: 2026-10-22
 ---
@@ -126,6 +127,11 @@ What the notes did not say:
 - MariaDB moved from 10.11 to 11.4.
 
 ## What broke
+
+> ⚠️ **State-changing.** The fixes below are a record of what was run on the lab, not a procedure:
+> `systemctl restart docker` restarts every container of the host (it was run before any container existed),
+> `systemctl reload docker` re-reads the daemon configuration, and `docker rmi` deletes images. On a running
+> deployment, follow the [version notes](2025.1-to-2026.1.md), whose steps carry their own warnings.
 
 1. **The 2025.1 deployment could not pull any image, because Docker was not using its proxy.**
    - The error: `failed to resolve reference "quay.io/openstack.kolla/cron:2025.1-ubuntu-noble": ... dial tcp: lookup quay.io on <local resolver>:53: ... i/o timeout`. The lab has no external DNS, so every image needs the proxy.

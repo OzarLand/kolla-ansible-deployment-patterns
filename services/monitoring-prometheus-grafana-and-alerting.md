@@ -216,9 +216,23 @@ copies the directory afresh.
 > run writes the fragments again. The Prometheus volume stays on disk until you remove it. Undo: set the variables to
 > `"yes"` again and run the deploy above, which recreates the containers and fragments.
 
+In 2026.1 each container is run by a systemd unit, `kolla-<container>-container.service`, which would start a
+removed container again in a loop: disable and remove the unit before removing the container. The loop below covers
+every monitoring container of the stable/2026.1 roles (`prometheus`, `prometheus-node-exporters`, `grafana`:
+`prometheus_server`, `prometheus_alertmanager`, `prometheus_node_exporter`, `prometheus_cadvisor`,
+`prometheus_openstack_exporter`, `prometheus_blackbox_exporter`, `prometheus_mysqld_exporter`,
+`prometheus_memcached_exporter`, `prometheus_libvirt_exporter`, `prometheus_elasticsearch_exporter`,
+`prometheus_openstack_network_exporter`, `prometheus_valkey_exporter`, `grafana`), on whichever host it exists.
+
 ```bash
-# on each host running them: the containers of the Topology table that exist there
-sudo docker rm -f prometheus_server prometheus_alertmanager grafana     # or: sudo podman rm -f ...
+# on each host of the monitoring, control, compute, network and storage groups
+sudo docker ps -a --format '{{.Names}}' | grep -E '^(prometheus_|grafana$)'   # read-only: what exists here
+for c in $(sudo docker ps -a --format '{{.Names}}' | grep -E '^(prometheus_|grafana$)'); do
+  sudo systemctl disable --now "kolla-${c}-container.service"
+  sudo rm -f "/etc/systemd/system/kolla-${c}-container.service"
+  sudo docker rm "$c"                                              # or: sudo podman rm ... (and podman ps above)
+done
+sudo systemctl daemon-reload
 # on each load balancer host
 sudo rm -f /etc/kolla/haproxy/services.d/prometheus-server.cfg \
            /etc/kolla/haproxy/services.d/prometheus-alertmanager.cfg \

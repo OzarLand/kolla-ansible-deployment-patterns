@@ -151,9 +151,14 @@ trade-off).
 > volume. Precondition: the other nodes form a healthy cluster (`cluster_status` on them lists each other as
 > running); one host at a time. Undo: the deploy below recreates it from the same volume.
 
+On Kolla-Ansible 2026.1 the container is run by the systemd unit `kolla-rabbitmq-container.service`: stop the unit
+first, or it starts the container again while you remove it. The unit stays enabled, and the deploy starts it again
+with the new container.
+
 ```bash
 # on this host
-sudo docker rm -f rabbitmq
+sudo systemctl stop kolla-rabbitmq-container.service
+sudo docker rm rabbitmq                                   # or: sudo podman rm rabbitmq
 # from the deploy host
 kolla-ansible deploy -i <inventory> --tags rabbitmq --limit <host>
 ```

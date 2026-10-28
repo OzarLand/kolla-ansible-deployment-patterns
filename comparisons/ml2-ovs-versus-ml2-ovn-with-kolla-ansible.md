@@ -11,6 +11,7 @@ environment:
   network: ml2/ovs or ml2/ovn
   storage: any
   os: any supported by Kolla-Ansible 2026.1
+risk: read-only
 confirmed_by: []
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/reference/networking/neutron.html

@@ -191,7 +191,8 @@ mariabackup --copy-back --target-dir /backup/restore/full
 
 **4. Start the database again.**
 
-- One MariaDB node: `sudo docker start mariadb`, then read `sudo docker logs mariadb`.
+- One MariaDB node: `sudo systemctl start kolla-mariadb-container.service` (in 2026.1 the container is run by this
+  systemd unit; `docker start` would bypass it), then read `sudo docker logs mariadb`.
 - A Galera cluster: bootstrap it from the restored node, after making the other nodes take a full copy from it.
 
 Why the extra step: after a restore, the other nodes hold data that is **newer** than the backup, with their own
@@ -242,8 +243,9 @@ your release.
 > done on every other node. If a node still refuses to join, read `docker logs mariadb` and
 > `/var/log/kolla/mariadb/mariadb.log` on it before doing anything else: a line saying that the states diverged, or
 > `Local state seqno ... is greater than group seqno`, means its data was not cleared.
-> A full state transfer of a large database can outlast the role's waits (about 11 minutes for a joiner's port, about
-> 5 minutes for `Synced`): if `mariadb-recovery` times out on a joiner, check `docker logs mariadb` there for the
+> A full state transfer of a large database can outlast the role's waits (`recover_cluster.yml`: for a joiner's port,
+> 10 retries 6 s apart with up to 60 s per attempt, about 11 minutes; for `Synced`, 30 retries 10 s apart, about
+> 5 minutes): if `mariadb-recovery` times out on a joiner, check `docker logs mariadb` there for the
 > transfer's progress before running it again.
 
 ```bash

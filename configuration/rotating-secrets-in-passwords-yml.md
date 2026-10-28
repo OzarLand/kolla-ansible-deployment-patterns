@@ -111,10 +111,10 @@ for new RabbitMQ credentials takes time, so it recommends stopping everything an
 
 ```bash
 kolla-ansible stop -i <inventory> --yes-i-really-really-mean-it
-# on each RabbitMQ node
-sudo docker stop rabbitmq
-sudo docker rm rabbitmq
-sudo docker volume rm rabbitmq
+# on each RabbitMQ node: the container is run by a systemd unit in 2026.1; stop the unit, not the container
+sudo systemctl stop kolla-rabbitmq-container.service
+sudo docker rm rabbitmq                    # or: sudo podman rm rabbitmq
+sudo docker volume rm rabbitmq             # or: sudo podman volume rm rabbitmq
 # then, from the deployment host
 kolla-ansible deploy -i <inventory>
 ```

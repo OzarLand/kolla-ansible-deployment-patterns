@@ -144,8 +144,9 @@ and ended with `failed=0`; the APIs answered again without restarting them.
 
 The role waits for the bootstrap node to be `OPERATIONAL`, for each other node to be `Synced` (the others replace
 their data by an incremental or full state transfer), then restarts the bootstrap node normally, so that no node keeps
-the bootstrap setting. The role's waits are about 10 × 6 seconds for a joiner's port and 30 × 10 seconds for
-`Synced`; a full transfer of a large database can take longer. If the run times out on a joiner, read
+the bootstrap setting. The role's waits (`recover_cluster.yml`, stable/2026.1): for a joiner's port, 10 retries
+6 seconds apart, each attempt waiting up to 60 seconds (`timeout: 60`), so up to about 11 minutes; for `Synced`,
+30 retries 10 seconds apart, about 5 minutes. A full transfer of a large database can take longer. If the run times out on a joiner, read
 `docker logs mariadb` there for the transfer's progress before running anything again.
 
 **3. Check which host was chosen, and why** (read-only). The role writes the chosen host to

@@ -130,13 +130,25 @@ storage patterns.
 inventory/
   hosts                         # control, network, compute groups
   group_vars/
-    control.yml                 # api_interface: bond0.110
+    all.yml                     # api_interface: bond0.110    every host: controllers, network hosts and computes all
+                                #                             reach MariaDB, RabbitMQ and the APIs on the API network
+                                # tunnel_interface: bond0.120 VXLAN/Geneve endpoints: network hosts and computes
+                                #                             (ML2/OVS), computes and gateway chassis (ML2/OVN)
     network.yml                 # neutron_external_interface: bond1
-    compute.yml                 # tunnel_interface: bond0.120
 globals.yml                     # neutron_plugin_agent, VIP addresses: one value for all hosts
 config/neutron.conf             # [DEFAULT] global_physnet_mtu, when not 1500
 config/neutron/ml2_conf.ini     # [ml2] path_mtu, [ml2_type_vlan] network_vlan_ranges
 ```
+
+In stable/2026.1 `api_interface` defaults to `network_interface` (`ansible/group_vars/all/common.yml`) and
+`tunnel_interface` to `network_interface` too (`ansible/group_vars/all/openvswitch.yml`): every host that runs a
+service needs an API address, and every host with a tunnel endpoint needs a tunnel address. The example works because
+the bonds and VLANs have the same names on every host, so one value in `all.yml` serves every group. Where names
+differ, set both variables for **every** group that needs them (API: all; tunnel: network and compute, plus
+controllers when they also run the network services, as in the default multinode inventory), or per host in
+`host_vars/<host>.yml`. Do not give a host two different values through two of its groups: Ansible then keeps the
+value of the group it loads last, which is easy to get wrong. `neutron_external_interface` also goes to the computes
+that need it (provider networks, DVR, or `neutron_ovn_distributed_fip`; table above).
 
 ### MTU
 
