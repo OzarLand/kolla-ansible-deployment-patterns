@@ -192,3 +192,6 @@ Nothing broke during `kolla-ansible upgrade` itself.
 
 *Provenance: written by agent:lab-reviewer, from a lab upgrade run on 2026-10-22.
 Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=version-notes/upgrade-report-2025.1-to-2026.1-all-in-one-lab.md&title=Feedback%3A+version-notes/upgrade-report-2025.1-to-2026.1-all-in-one-lab.md):
+your release, your topology, and what happened.

@@ -50,7 +50,7 @@ deployment can compare approaches and learn from others' experience.
 | Reference topologies and node roles, from all-in-one labs to multi-controller, multi-network-node production | Running instances: see [openstack-vm-runbooks](https://github.com/OzarLand/openstack-vm-runbooks) |
 | Lab, pre-production and production environments: how they differ and how they are kept comparable | Upgrade campaigns beyond release notes: planned for a future `openstack-upgrade-playbooks` repository; until it exists, release notes and upgrade reports live in `version-notes/` |
 | Network design: interfaces, management/API/tunnel/external/storage networks, OVN versus OVS, provider networks, MTU, bonding | Other deployment tools: welcome as separate pattern repositories when their operators show up |
-| Storage choices: Ceph, LVM, NFS and others for Glance, Cinder and Nova; what is shared and what is local | Anything that reproduces the upstream documentation instead of adding operational experience to it |
+| Storage choices: Ceph, LVM, NFS and others for Glance, Cinder and Nova; what is shared and what is local | Copies of the upstream documentation. A page may synthesise the upstream documentation and source code, but it says so in *Validity and limits*, adds the operational context (what fails, what it costs, what to check), and stays `draft` until someone other than its author has run it |
 | Inventories, `globals.yml`, group and host variables, configuration overrides: how they are organised and versioned across environments | |
 | Secrets and configuration files: how `passwords.yml` and certificates are handled (never their content) | |
 | Architectural choices and their operational consequences | |
@@ -77,8 +77,12 @@ flowchart LR
     class L green
 ```
 
-Deployment errors and day-2 operations follow the
-[runbook template](https://github.com/OzarLand/ozarland/blob/main/community/templates/runbook.md).
+Deployment errors follow the
+[runbook template](https://github.com/OzarLand/ozarland/blob/main/community/templates/runbook.md). Day-2 operations
+are patterns too (`kind: pattern`), whose procedure steps carry the runbook-style ⚠️ and 🛑 warnings. Release notes
+follow the [upgrade playbook template](https://github.com/OzarLand/ozarland/blob/main/community/templates/upgrade-playbook.md),
+upgrade reports the [experience report template](https://github.com/OzarLand/ozarland/blob/main/community/templates/experience-report.md).
+Each folder's README lists its pages and the template to use.
 
 ## 🗂️ How content is organised
 

@@ -386,3 +386,6 @@ from the deploy host instead of the node. This is a learning lab, not a pattern 
 
 *Provenance: written by agent:lab-reviewer, from a lab build on 2026.1.
 Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=topologies/all-in-one-lab-on-a-single-vm.md&title=Feedback%3A+topologies/all-in-one-lab-on-a-single-vm.md):
+your release, your topology, and what happened.

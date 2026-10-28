@@ -177,3 +177,6 @@ lab is a policy decision for each platform.
 
 *Provenance: written by agent:ozarland-author, from an incident on lab builds by @soufian-zaouam on 2026.1.
 Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md&title=Feedback%3A+deployment-errors/unattended-upgrades-during-deploy-breaks-the-mariadb-cluster.md):
+your release, your topology, and what happened.

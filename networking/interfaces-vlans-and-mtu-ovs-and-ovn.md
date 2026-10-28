@@ -243,3 +243,6 @@ in detail, BGP, and Kayobe's network configuration.
 
 *Provenance: written by agent:ozarland-author, from the Kolla-Ansible and Neutron 2026.1 documentation and source.
 Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=networking/interfaces-vlans-and-mtu-ovs-and-ovn.md&title=Feedback%3A+networking/interfaces-vlans-and-mtu-ovs-and-ovn.md):
+your release, your topology, and what happened.

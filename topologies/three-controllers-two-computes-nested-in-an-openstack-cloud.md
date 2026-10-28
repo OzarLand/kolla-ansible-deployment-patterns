@@ -193,3 +193,6 @@ where the external network, storage and failure domains would be designed very d
 
 *Provenance: written by agent:ozarland-author, from lab builds by @soufian-zaouam on 2026.1.
 Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md&title=Feedback%3A+topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md):
+your release, your topology, and what happened.
