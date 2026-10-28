@@ -40,10 +40,13 @@ does with them, and how to check each service.
 ## Topology
 
 No Kolla-Ansible role on the Ceph hosts. The clients run in the containers that use them: `glance_api`,
-`cinder_volume`, `cinder_backup`, `nova_compute` and `nova_libvirt`. Cinder needs hosts in the `storage` group even
-without local storage: the guide says that with external Ceph "there may be no nodes defined in the storage group",
-which "will cause Cinder and related services relying on this group to fail"; put there the hosts where
-`cinder-volume` and `cinder-backup` should run, usually the controllers.
+`cinder_volume`, `cinder_backup`, `nova_compute` and `nova_libvirt`. In Kolla-Ansible 2026.1, `cinder-volume` and
+`cinder-backup` run on the hosts of the `cinder` group, which the sample `multinode` inventory makes the `control`
+group; the `storage` group is only used by the LVM variants (`cinder-volume-lvm`, `cinder-backup-lvm`). The external
+Ceph guide still says that with no node in the `storage` group "Cinder and related services relying on this group"
+fail; that sentence predates the move to the `cinder` group (see
+[Cinder and Glance back-ends compared](../storage/cinder-and-glance-backends-compared-lvm-ceph-nfs.md)). Put the
+hosts where `cinder-volume` and `cinder-backup` should run in the `cinder` group, usually the controllers.
 
 ## Network design
 
@@ -215,7 +218,7 @@ every volume or boot converts them (Ceph's OpenStack guide).
 | `nova_backend_ceph: "yes"` | Local instance disks | Live migration without copying disks; one store | All instance I/O goes over the storage network to Ceph |
 | Raw images in Glance | qcow2 | Copy-on-write clones for volumes and instances | Larger uploads |
 | `show_image_direct_url = True` for Glance | Off | Needed for copy-on-write | The guide warns of a security risk when Glance has back-ends other than Ceph |
-| `cinder-volume` on the controllers in `storage` | Dedicated hosts | No extra hosts for a client-only service | The `storage` group must not be empty, or Cinder fails to deploy |
+| `cinder-volume` on the controllers (the `cinder` group) | Dedicated hosts | No extra hosts for a client-only service | The `cinder` group must not be empty, or Cinder has nowhere to run |
 
 ## What went wrong during deployment
 

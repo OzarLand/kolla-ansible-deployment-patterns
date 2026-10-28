@@ -1,7 +1,7 @@
 ---
 title: All-in-one lab on a single VM, nested inside an existing OpenStack cloud
 kind: pattern
-status: lab-verified
+status: draft
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, keystone, glance, nova, neutron, placement, heat, horizon, ovs, mariadb, rabbitmq, memcached, libvirt, docker]
 deployment_methods: [kolla-ansible]

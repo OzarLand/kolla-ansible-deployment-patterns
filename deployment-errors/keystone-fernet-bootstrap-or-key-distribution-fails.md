@@ -10,7 +10,7 @@ environment:
   network: any
   storage: any
   os: any host OS supported by the Kolla-Ansible release
-risk: state-changing
+risk: destructive
 confirmed_by:
   - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0, multinode (3 controllers, 2 computes)", date: 2026-10-27, note: "cause 1 (every keystone_fernet stopped, deploy with --limit) and its start-then-deploy resolution; cause 2 simulated with a DROP of port 8023 on one controller, resolved by removing it during the wait; cause 3 (keys removed on one host) with steps 1-4; quick checks and Verification run; start/stop with systemctl, not docker. A first deployment with --limit, kolla_serial, a bootstrap on an empty cluster, a push from an empty host, a different keystone_ssh_key and keystone_ssh stopped not run" }
 upstream_refs:
@@ -158,11 +158,13 @@ sudo ls -l /var/lib/docker/volumes/keystone_fernet_tokens/_data/    # expected: 
 sudo systemctl start kolla-keystone_fernet-container.service    # Kolla-Ansible 2026.1: systemd units, not docker start
 ```
 
-> ⚠️ **State-changing.** A full run of the keystone role on every host. If no `keystone_fernet` runs anywhere, it
+> 🛑 **Destructive.** A full run of the keystone role on every host. If no `keystone_fernet` runs anywhere, it
 > runs `fernet_setup` on the first Keystone host: on an empty key repository this creates new keys, every existing
 > token becomes invalid and users must authenticate again (whether `fernet_setup` replaces keys already present was
 > not checked for this page). If the push source has an empty key directory, the keys of every other host are
 > deleted and every Keystone API fails. Undo: none for the invalidated tokens or the deleted keys.
+> Before running it, copy `/etc/kolla/keystone/fernet-keys` (or the `keystone_fernet_tokens` volume) from a host whose
+> keys are complete, so the keys can be put back.
 
 ```bash
 kolla-ansible deploy -i <inventory> --tags keystone

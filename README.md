@@ -9,8 +9,8 @@
 <p>
 <!-- status-badges:start -->
   <img src="https://img.shields.io/badge/pages-39-informational.svg" alt="39 pages">
-  <img src="https://img.shields.io/badge/lab--verified-9-16a34a.svg" alt="9 pages lab-verified">
-  <img src="https://img.shields.io/badge/draft-30-9ca3af.svg" alt="30 pages draft">
+  <img src="https://img.shields.io/badge/lab--verified-8-16a34a.svg" alt="8 pages lab-verified">
+  <img src="https://img.shields.io/badge/draft-31-9ca3af.svg" alt="31 pages draft">
   <img src="https://img.shields.io/badge/validated-0-2563eb.svg" alt="0 pages validated">
 <!-- status-badges:end -->
   <img src="https://img.shields.io/badge/OpenStack-2026.1-ED1944.svg" alt="OpenStack 2026.1">
@@ -129,11 +129,11 @@ flowchart LR
 </details>
 
 <!-- status-progress:start -->
-**Where things stand:** 39 pages, 9 `lab-verified`, 30 `draft`, none `validated` or `experimental`.
+**Where things stand:** 39 pages, 8 `lab-verified`, 31 `draft`, none `validated` or `experimental`.
 
 | Folder | Progress | Lab-verified or validated |
 |---|---|---:|
-| 🏗️ Topologies | 🟩🟩🟩🟩🟩⬜⬜⬜⬜⬜ | 1 / 2 |
+| 🏗️ Topologies | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ | 0 / 2 |
 | 🌐 Networking | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ | 0 / 2 |
 | 💾 Storage | ⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜ | 0 / 2 |
 | 🧾 Configuration | 🟩🟩⬜⬜⬜⬜⬜⬜⬜⬜ | 1 / 6 |
@@ -162,7 +162,7 @@ Click a category to open it.
 | Pattern | Purpose | Scale | Network | Storage | Releases | Status |
 |---|---|---|---|---|---|---|
 | [Three controllers and two computes, nested inside an existing OpenStack cloud](topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md) | lab | 3 controllers, 2 computes | OVS, VXLAN | local instance store | 2026.1 | draft |
-| [All-in-one lab on a single VM, nested inside an existing OpenStack cloud](topologies/all-in-one-lab-on-a-single-vm.md) | lab | 1 node (all-in-one) | OVS | local root disk | 2026.1 | lab-verified |
+| [All-in-one lab on a single VM, nested inside an existing OpenStack cloud](topologies/all-in-one-lab-on-a-single-vm.md) | lab | 1 node (all-in-one) | OVS | local root disk | 2026.1 | draft |
 
 </details>
 
