@@ -348,8 +348,9 @@ rm -rf ~/.lab/<lab-vm>
 
 ## Version notes
 
-- 2026.1 (Kolla-Ansible 22.x) enables ProxySQL by default: an all-in-one without HAProxy needs
-  `enable_proxysql: "no"` as well as `enable_haproxy: "no"`.
+- ProxySQL is on by default in 2026.1 (Kolla-Ansible 22.x, `enable_proxysql: "{{ enable_mariadb }}"`), as it already
+  was in 2025.1 (`enable_proxysql: "yes"`): an all-in-one without HAProxy needs `enable_proxysql: "no"` as well as
+  `enable_haproxy: "no"`.
 - On Ubuntu 24.04, `bootstrap-servers` installs the Docker SDK from the `python3-docker` package, in the system
   Python only.
 

@@ -95,7 +95,10 @@ commands for it on purpose: follow the guide of your release, on a lab first.
 - What a Podman package upgrade does to running containers depends on the distribution's packaging; it was not
   tested here.
 - The host preparation (`bootstrap-servers`, the `baremetal` role) is in the `openstack.kolla` collection, installed
-  by `install-deps`; it was not read for this page.
+  by `install-deps`. Its Docker side was read for the
+  [bootstrap-servers page](../operations/bootstrap-servers-what-it-changes-and-its-pitfalls.md) (`stable/2026.1`);
+  its Podman side (the collection's `podman` role) was read neither there nor here, so what `bootstrap-servers`
+  installs and configures on a Podman host is not described on either page.
 - Not covered: rootless Podman (Kolla-Ansible runs the containers as root), Podman's own auto-update, and Podman's
   registries configuration.
 

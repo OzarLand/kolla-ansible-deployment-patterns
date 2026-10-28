@@ -75,8 +75,14 @@ docker_registry_ca: "/etc/kolla/certificates/registry-ca.crt"   # a path on the 
 # docker_registry_username: "<user>"     # if the registry needs a login; the password is docker_registry_password
 ```
 
-`docker_registry_ca` is a variable of the `docker` role in `ansible-collection-kolla` (2026.1): with a registry
-certificate signed by a private CA, it puts the CA where Docker looks for it, without making the registry insecure.
+`docker_registry_ca` is a variable of the `docker` role in `ansible-collection-kolla` (stable/2026.1,
+`roles/docker/defaults/main.yml`, empty by default; `roles/docker/tasks/config.yml`): with a registry certificate
+signed by a private CA, `bootstrap-servers` copies that file from the deploy host to
+`/etc/docker/certs.d/<docker_registry>/ca.crt` on the targets, without making the registry insecure. The copy is made
+only when `docker_registry_insecure` is false, and a changed file notifies the role's `Restart docker` handler, which
+restarts every container of the host: apply it before the first deploy, or in a window. The `podman` role has a
+`podman_registry_ca` variable, but in stable/2026.1 its copy task reads `private_registry_ca` and `private_registry`
+(`roles/podman/tasks/config.yml`); how that behaves on a Podman host was not tested here.
 `docker_registry_password` is in `passwords.yml`; the password rotation guide notes that Kolla-Ansible does not manage
 the registry itself.
 

@@ -222,7 +222,7 @@ every volume or boot converts them (Ceph's OpenStack guide).
 
 ## What went wrong during deployment
 
-Nothing observed yet: written from the Kolla-Ansible external Ceph guide, the 2026.1 roles and Ceph's documentation.
+Nothing observed yet against a Ceph cluster: written from the Kolla-Ansible external Ceph guide, the 2026.1 roles and Ceph's documentation; only the read-only checks listed in *Validity and limits* were run on a lab.
 
 ## Version notes
 
@@ -243,8 +243,11 @@ No first-hand lessons yet. What the sources make clear:
 ## Validity and limits
 
 Written from Kolla-Ansible 2026.1 (external Ceph guide, `ansible/group_vars/all/{ceph,cinder,glance}.yml`, the
-`cinder`, `glance` and `nova-cell` roles) and Ceph's *Block devices and OpenStack* and user management guides. Not run
-on a lab: no output on this page was observed. Not covered: several Ceph clusters, Manila with CephFS, Gnocchi,
+`cinder`, `glance` and `nova-cell` roles) and Ceph's *Block devices and OpenStack* and user management guides. Only the
+read-only checks that need no Ceph cluster were run on a lab (an all-in-one with Kolla-Ansible 22.2.0, 2026-10-27, see
+`confirmed_by`): the defaults, the keyring checks, the template rendering and the libvirt secret names, and an empty
+`virsh secret-list`. Nothing was run against a Ceph cluster: `rbd ls`, the prechecks, the reconfigure and the test
+resources were not, so no output involving Ceph on this page was observed. Not covered: several Ceph clusters, Manila with CephFS, Gnocchi,
 RadosGW, Ceph without cephx, migrating existing data into Ceph, and Ceph's own sizing and operations.
 
 ## Related
