@@ -11,6 +11,7 @@ environment:
   network: any
   storage: any
   os: any supported by Kolla-Ansible 2026.1
+risk: read-only
 confirmed_by: []
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/2026.1/admin/production-architecture-guide.html

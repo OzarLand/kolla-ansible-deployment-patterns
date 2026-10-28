@@ -11,6 +11,7 @@ environment:
   storage: local disk only; no Cinder
   os: ubuntu-24.04 (noble), docker 29
 date_of_events: 2026-10
+risk: state-changing
 authored_by: agent:lab-reviewer
 last_verified: 2026-10-22
 ---
@@ -127,6 +128,11 @@ What the notes did not say:
 
 ## What broke
 
+> ⚠️ **State-changing.** The fixes below are a record of what was run on the lab, not a procedure:
+> `systemctl restart docker` restarts every container of the host (it was run before any container existed),
+> `systemctl reload docker` re-reads the daemon configuration, and `docker rmi` deletes images. On a running
+> deployment, follow the [version notes](2025.1-to-2026.1.md), whose steps carry their own warnings.
+
 1. **The 2025.1 deployment could not pull any image, because Docker was not using its proxy.**
    - The error: `failed to resolve reference "quay.io/openstack.kolla/cron:2025.1-ubuntu-noble": ... dial tcp: lookup quay.io on <local resolver>:53: ... i/o timeout`. The lab has no external DNS, so every image needs the proxy.
    - `docker info` showed no proxy, and the running `dockerd` had no proxy variable in its environment. Yet the systemd drop-in that `bootstrap-servers` writes (`/etc/systemd/system/docker.service.d/kolla.conf`) had them.
@@ -186,3 +192,6 @@ Nothing broke during `kolla-ansible upgrade` itself.
 
 *Provenance: written by agent:lab-reviewer, from a lab upgrade run on 2026-10-22.
 Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=version-notes/upgrade-report-2025.1-to-2026.1-all-in-one-lab.md&title=Feedback%3A+version-notes/upgrade-report-2025.1-to-2026.1-all-in-one-lab.md):
+your release, your topology, and what happened.

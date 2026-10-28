@@ -10,7 +10,7 @@ environment:
   network: any
   storage: any
   os: any host OS supported by the Kolla-Ansible release
-risk: state-changing
+risk: destructive
 confirmed_by:
   - { who: "agent:lab-reviewer", type: lab, release: "2026.1", deployment: "kolla-ansible 22.2.0 all-in-one, ML2/OVS", date: 2026-10-27, note: "cause 3 rename variant reproduced (host = override after deleting the service) and fixed by removing the override and deploying again (--tags nova, no --limit on an all-in-one); causes 1 and 2, the libvirt unit commands, prechecks, fact-cache clear and deletion of a wrongly named record not run" }
 upstream_refs:
@@ -178,7 +178,7 @@ Remove the `host =` override, or keep it consistently on purpose and know that K
 Clear a stale fact cache if the host was renamed. If a wrong service record was created, delete it once the right
 one exists.
 
-> ⚠️ **State-changing.** Deletes a compute service record and, with it, its compute node record in Nova. Only for a
+> 🛑 **Destructive.** Deletes a compute service record and, with it, its compute node record in Nova. Only for a
 > record with no instances: check with `openstack server list --all-projects --host <wrong-name>` first. Cannot be
 > undone; the service registers again if the `nova-compute` that created it is still running under that name.
 

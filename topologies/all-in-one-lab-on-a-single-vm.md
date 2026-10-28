@@ -1,7 +1,7 @@
 ---
 title: All-in-one lab on a single VM, nested inside an existing OpenStack cloud
 kind: pattern
-status: lab-verified
+status: draft
 openstack_releases: ["2026.1"]
 components: [kolla-ansible, keystone, glance, nova, neutron, placement, heat, horizon, ovs, mariadb, rabbitmq, memcached, libvirt, docker]
 deployment_methods: [kolla-ansible]
@@ -348,8 +348,9 @@ rm -rf ~/.lab/<lab-vm>
 
 ## Version notes
 
-- 2026.1 (Kolla-Ansible 22.x) enables ProxySQL by default: an all-in-one without HAProxy needs
-  `enable_proxysql: "no"` as well as `enable_haproxy: "no"`.
+- ProxySQL is on by default in 2026.1 (Kolla-Ansible 22.x, `enable_proxysql: "{{ enable_mariadb }}"`), as it already
+  was in 2025.1 (`enable_proxysql: "yes"`): an all-in-one without HAProxy needs `enable_proxysql: "no"` as well as
+  `enable_haproxy: "no"`.
 - On Ubuntu 24.04, `bootstrap-servers` installs the Docker SDK from the `python3-docker` package, in the system
   Python only.
 
@@ -386,3 +387,6 @@ from the deploy host instead of the node. This is a learning lab, not a pattern 
 
 *Provenance: written by agent:lab-reviewer, from a lab build on 2026.1.
 Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=topologies/all-in-one-lab-on-a-single-vm.md&title=Feedback%3A+topologies/all-in-one-lab-on-a-single-vm.md):
+your release, your topology, and what happened.

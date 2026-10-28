@@ -11,6 +11,7 @@ environment:
   network: ml2/ovs, VXLAN tenant networks, provider network on the controllers
   storage: local instance store on each compute (one dedicated volume each); no Cinder, no Ceph
   os: ubuntu-24.04 (noble) on the lab hosts, ubuntu-22.04 on the deploy host; docker
+risk: read-only
 confirmed_by: []
 upstream_refs:
   - https://docs.openstack.org/kolla-ansible/latest/user/multinode.html
@@ -85,9 +86,13 @@ Without trunk ports, every host gets **one port per network**:
 - **External interface on the controllers.** It must be up but carry no address, persistently, because OVS owns it.
   A netplan file matching the interface by MAC address with `dhcp4: false`, `dhcp6: false`, `accept-ra: false`,
   `link-local: []`, the lab MTU, and `optional: true` so that boot does not wait for it.
-- **VIP and VRRP.** keepalived keeps its default multicast mode (it passes in this cloud), but
-  `keepalived_virtual_router_id` is set to a value unique to the lab: the default `51` would collide with another
-  lab or any other keepalived on the same network.
+- **VIP and VRRP.** keepalived runs in unicast mode (`keepalived_traffic_mode: "unicast"`; the default in the
+  `loadbalancer` role is `"multicast"`), so VRRP needs no multicast in the hosting cloud; Kolla-Ansible writes a
+  `unicast_peer` list of the other load balancer hosts' API addresses. `keepalived_virtual_router_id` is also set to a
+  value unique to the lab: the default `51` would collide with another lab or any other keepalived on the same
+  network. The lab checks of 2026-10-27 recorded on the VIP timeout page and in the VM runbooks all ran in unicast
+  mode. The first version of this page (2026-10-21) said the default multicast mode passed in this cloud; that was
+  not checked again, and multicast mode has not been reproduced on the lab since.
 
 ## Storage design
 
@@ -114,6 +119,7 @@ Values that differ from Kolla-Ansible defaults, and nothing else:
 
 | Setting | Default | Here | Why |
 |---|---|---|---|
+| `keepalived_traffic_mode` | `multicast` | `unicast` | VRRP without depending on multicast in the hosting cloud |
 | `keepalived_virtual_router_id` | `51` | unique per lab | avoid VRRP collisions on a shared network |
 | `global_physnet_mtu` (Neutron, override) | 1500 | 1442 | the hosting cloud's MTU |
 | `prechecks_enable_host_os_checks` | `true` | `false` for the `deployment` group only | the deploy host runs Ubuntu 22.04, which the 2026.1 prechecks refuse; the lab hosts are still checked |
@@ -164,8 +170,8 @@ Everything else: Kolla-Ansible defaults (`neutron_plugin_agent: openvswitch`, `n
 
 - Measure the hosting cloud before designing the lab: MTU, nested virtualisation, allowed address pairs, VRRP,
   trunks, egress. Every divergence from Kolla-Ansible defaults in this pattern comes from one of those facts.
-- Keep the divergences in one table. Three settings differ from Kolla-Ansible's defaults here; everything else being
-  default is what makes the lab's behaviour comparable with other deployments.
+- Keep the divergences in one table. The six rows of the table above are the only settings that differ from
+  Kolla-Ansible's defaults here; everything else being default is what makes the lab's behaviour comparable with other deployments.
 - Disable automatic upgrades on hosts you deploy to, or schedule them: they will otherwise run in the middle of a
   deploy one morning.
 - Give the instance store its own file system on every compute, in a lab as in production.
@@ -187,3 +193,6 @@ where the external network, storage and failure domains would be designed very d
 
 *Provenance: written by agent:ozarland-author, from lab builds by @soufian-zaouam on 2026.1.
 Reviewed in its pull request (see the page history). Checked by a human operator: not yet.*
+
+**Worked for you, or not?** [Tell us in one line](https://github.com/OzarLand/kolla-ansible-deployment-patterns/issues/new?template=documentation-proposal.yml&page=topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md&title=Feedback%3A+topologies/three-controllers-two-computes-nested-in-an-openstack-cloud.md):
+your release, your topology, and what happened.
